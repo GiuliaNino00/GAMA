@@ -321,18 +321,38 @@ export function giorniCompilatiPer(db, utente, dal, al) {
   return out;
 }
 
-/** Gli ultimi giorni di lavoro ancora vuoti per questo utente (Date, dal piu' recente). */
+/** I giorni di lavoro ancora vuoti per questo utente, da D.inizioRecupero a oggi (Date, dal piu' recente). */
 export function giorniDaSistemare(db, utente, adesso = new Date()) {
   if (!dipendentiDi(db, utente).length) return [];
   const oggi = D.oggi(adesso);
-  const dal = D.aggiungiGiorni(oggi, -(CFG.GIORNI_RECUPERO - 1));
+  const dal = D.inizioRecupero(adesso);
   const fatti = giorniCompilatiPer(db, utente, dal, oggi);
   const out = [];
-  for (let i = 0; i < CFG.GIORNI_RECUPERO; i++) {
-    const d = D.aggiungiGiorni(oggi, -i);
+  for (let d = oggi; d >= dal; d = D.aggiungiGiorni(d, -1)) {
     if (D.giornoDiLavoro(d) && !fatti[D.chiave(d)]) out.push(d);
   }
   return out;
+}
+
+/**
+ * I giorni di lavoro di un mese (anche quelli che devono ancora venire) che per
+ * questo utente non sono compilati: [3, 4, 17]. Con l'amministratore vuol dire
+ * "almeno una squadra non ha segnato". Vuoto = mese completo.
+ */
+export function giorniMancantiDelMese(db, utente, anno, mese0) {
+  if (!dipendentiDi(db, utente).length) return [];
+  const dal = new Date(anno, mese0, 1), al = new Date(anno, mese0 + 1, 0);
+  const fatti = giorniCompilatiPer(db, utente, dal, al);
+  const out = [];
+  for (let d = dal; d <= al; d = D.aggiungiGiorni(d, 1)) {
+    if (D.giornoDiLavoro(d) && !fatti[D.chiave(d)]) out.push(d.getDate());
+  }
+  return out;
+}
+
+/** Il foglio per l'agenzia si fa solo quando ogni squadra ha compilato ogni giorno di lavoro. */
+export function mancantiPerIlFoglio(db, anno, mese0) {
+  return giorniMancantiDelMese(db, { admin: true }, anno, mese0);
 }
 
 // ---------------------------------------------------------------- compensi extra

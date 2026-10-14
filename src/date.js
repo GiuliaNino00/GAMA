@@ -58,8 +58,27 @@ export function timbro(d = new Date()) {
   return chiave(d) + ' ' + due(d.getHours()) + ':' + due(d.getMinutes()) + ':' + due(d.getSeconds());
 }
 
-/** Si fa l'appello in questo giorno della settimana? */
+/**
+ * Il primo giorno che un socio puo' ancora compilare o correggere: il 1° del mese
+ * in corso, oppure il 1° del mese prima fino al giorno CFG.GIORNO_CHIUSURA_MESE_PRIMA.
+ */
+export function inizioRecupero(adesso = new Date()) {
+  const o = oggi(adesso);
+  const inizio = new Date(o.getFullYear(), o.getMonth() - (o.getDate() <= CFG.GIORNO_CHIUSURA_MESE_PRIMA ? 1 : 0), 1);
+  const primo = primoGiorno();
+  return primo && primo > inizio ? primo : inizio;
+}
+
+/** Dal file .env (PRIMO_GIORNO=2026-10-01): da quando si usa l'app. Prima non si chiede di compilare niente. */
+export function primoGiorno() {
+  const v = String(process.env.PRIMO_GIORNO || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? daChiave(v) : null;
+}
+
+/** Si fa l'appello in questo giorno? (Prima di PRIMO_GIORNO no: l'app non c'era.) */
 export function giornoDiLavoro(d) {
+  const primo = primoGiorno();
+  if (primo && d < primo) return false;
   const dow = d.getDay();
   if (dow === 0) return CFG.APPELLO_ANCHE_DOMENICA;
   if (dow === 6) return CFG.APPELLO_ANCHE_SABATO;

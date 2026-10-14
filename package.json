@@ -1,6 +1,6 @@
 {
   "name": "presenze-gama",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Presenze GAMA: app web per l'appello giornaliero, su server proprio",
   "main": "src/server.js",
   "scripts": {

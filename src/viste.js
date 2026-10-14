@@ -47,12 +47,12 @@ export function datiAppello(db, data, utente) {
 export function datiGiorni(db, utente, adesso = new Date()) {
   if (!Q.dipendentiDi(db, utente).length) return [];
   const oggi = D.oggi(adesso);
-  const fatti = Q.giorniCompilatiPer(db, utente, D.aggiungiGiorni(oggi, -(CFG.GIORNI_RECUPERO - 1)), oggi);
+  const dal = D.inizioRecupero(adesso);
+  const fatti = Q.giorniCompilatiPer(db, utente, dal, oggi);
   const out = [];
-  for (let i = 0; i < CFG.GIORNI_RECUPERO; i++) {
-    const d = D.aggiungiGiorni(oggi, -i);
+  for (let d = oggi; d >= dal; d = D.aggiungiGiorni(d, -1)) {
     if (!D.giornoDiLavoro(d)) continue;
-    out.push({ codice: D.codice(d), etichetta: D.umana(d), fatto: fatti[D.chiave(d)] === true, oggi: i === 0 });
+    out.push({ codice: D.codice(d), etichetta: D.umana(d), fatto: fatti[D.chiave(d)] === true, oggi: d.getTime() === oggi.getTime() });
   }
   return out;
 }
@@ -61,7 +61,7 @@ export function datiGiorni(db, utente, adesso = new Date()) {
  * Lo stato di ogni giorno di un periodo, dal punto di vista dell'utente:
  *   fatto · parziale (solo amministratore: una squadra si', l'altra no) · mancante ·
  *   riposo (domenica senza presenze) · futuro.
- * `apribile`: si puo' aprire l'appello di quel giorno (i soci solo gli ultimi 14).
+ * `apribile`: si puo' aprire l'appello di quel giorno (i soci da D.inizioRecupero in poi).
  */
 export function statoGiorni(db, utente, dal, al, adesso = new Date()) {
   const oggi = D.oggi(adesso);
@@ -69,7 +69,7 @@ export function statoGiorni(db, utente, dal, al, adesso = new Date()) {
   const fatti = Q.giorniCompilatiPer(db, utente, dal, al);
   const conRighe = {};
   for (const p of Q.presenzeIntervallo(db, dal, al)) if (visibili.has(p.dipendenteId)) conRighe[p.data] = true;
-  const limite = utente.admin ? null : D.aggiungiGiorni(oggi, -(CFG.GIORNI_RECUPERO - 1));
+  const limite = utente.admin ? null : D.inizioRecupero(adesso);
   const out = [];
   for (let d = new Date(dal); d <= al; d = D.aggiungiGiorni(d, 1)) {
     const k = D.chiave(d);
@@ -139,7 +139,11 @@ export function datiMese(db, anno, mese0, utente, adesso = new Date()) {
   r.extra = Object.keys(extra).filter((n) => miei.has(n))
     .map((n) => ({ nome: n, importo: extra[n].totale, note: extra[n].note.join('; ') }));
   r.mese = String(anno) + String(mese0 + 1).padStart(2, '0');
-  r.scaricabile = !!(utente && utente.admin);
+  // il foglio per l'agenzia: solo l'amministratore, e solo a mese tutto compilato
+  const admin = !!(utente && utente.admin);
+  r.daCompletare = admin ? Q.mancantiPerIlFoglio(db, anno, mese0) : [];
+  r.scaricabile = admin && !r.daCompletare.length;
+  r.agenzia = admin ? CFG.AGENZIA : null;
   // il calendario del mese: quante caselle vuote prima del giorno 1 (lunedi' = 0)
   r.calendario = { vuoti: (dal.getDay() + 6) % 7, giorni: statoGiorni(db, utente, dal, al, adesso) };
   return r;

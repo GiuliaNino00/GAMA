@@ -27,13 +27,16 @@ export function esegui(db, utente, azione, carico, { urlPubblico = '', adesso = 
 
 // ---------------------------------------------------------------- appello
 
-/** Un socio sistema solo gli ultimi giorni; i mesi gia' chiusi li tocca l'amministratore. */
+/**
+ * Un socio sistema il mese in corso e, fino al 15, anche il mese prima (D.inizioRecupero);
+ * i mesi gia' chiusi li tocca l'amministratore.
+ */
 export function troppoVecchioPer(db, utente, data, adesso) {
   if (utente.admin) return '';
-  const limite = D.aggiungiGiorni(D.oggi(adesso), -(CFG.GIORNI_RECUPERO - 1));
+  const limite = D.inizioRecupero(adesso);
   if (data >= limite) return '';
   const admin = Q.nomiAmministratori(db)[0] || 'l\'amministratore';
-  return 'Si possono sistemare solo gli ultimi ' + CFG.GIORNI_RECUPERO + ' giorni. Per ' + D.umana(data) + ' chiedi a ' + admin + '.';
+  return 'Puoi sistemare i giorni da ' + D.umana(limite) + ' in poi. Per ' + D.umana(data) + ' chiedi a ' + admin + '.';
 }
 
 function salvaAppello(db, utente, c, adesso) {

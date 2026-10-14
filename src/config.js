@@ -30,9 +30,14 @@ export const CFG = {
   ORA_BACKUP: 2,            // copia di sicurezza del database, ogni notte
   BACKUP_DA_TENERE: 30,     // quante copie notturne conservare
 
-  GIORNI_RECUPERO: 14,      // quanti giorni indietro si possono sistemare
+  // I soci compilano e correggono tutti i giorni del mese in corso e, fino a
+  // questo giorno del mese compreso, anche quelli del mese prima.
+  GIORNO_CHIUSURA_MESE_PRIMA: 15,
   APPELLO_ANCHE_SABATO: true,
   APPELLO_ANCHE_DOMENICA: false,
+
+  // A chi va il foglio del mese (pulsante "Invia" dell'amministratore)
+  AGENZIA: { nome: 'Gama srl', email: 'gamasrl2026@gmail.com' },
 
   MESI: ['GENNAIO', 'FEBBRAIO', 'MARZO', 'APRILE', 'MAGGIO', 'GIUGNO',
          'LUGLIO', 'AGOSTO', 'SETTEMBRE', 'OTTOBRE', 'NOVEMBRE', 'DICEMBRE'],

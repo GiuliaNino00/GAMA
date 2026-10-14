@@ -5,7 +5,8 @@
  *   npm run cli -- nuovo-socio "Matteo" MURATORI
  *   npm run cli -- link                      (elenca i link personali)
  *   npm run cli -- nuovo-link "Matteo"       (il vecchio smette di funzionare)
- *   npm run cli -- foglio 202609 [file.xlsx] (salva il foglio di settembre 2026)
+ *   npm run cli -- foglio 202609 [file.xlsx] (salva il foglio di settembre 2026, solo se completo;
+ *                                             --anche-incompleto per farlo lo stesso)
  *   npm run cli -- prova-notifica "Giuliano"
  *   npm run cli -- backup
  */
@@ -53,7 +54,11 @@ switch (comando) {
     const m = String(arg[0] || '').match(/^(\d{4})(0[1-9]|1[0-2])$/);
     if (!m) esci('Indica il mese come AAAAMM, per esempio 202609.');
     const anno = Number(m[1]), mese0 = Number(m[2]) - 1;
-    const file = arg[1] || 'Presenze ' + nomeScheda(anno, mese0) + '.xlsx';
+    const manca = Q.mancantiPerIlFoglio(db, anno, mese0);
+    if (manca.length && !arg.includes('--anche-incompleto')) {
+      esci('Il mese non è completo, mancano i giorni ' + manca.join(', ') + '. Per farlo lo stesso aggiungi --anche-incompleto');
+    }
+    const file = arg.slice(1).find((a) => a !== '--anche-incompleto') || 'Presenze ' + nomeScheda(anno, mese0) + '.xlsx';
     fs.writeFileSync(file, await foglioMese(db, anno, mese0));
     console.log('Scritto ' + file);
     break;
@@ -76,7 +81,7 @@ switch (comando) {
       '  nuovo-socio "Nome" SQUADRA    crea un socio (' + CFG.SQUADRE.join(' / ') + ')',
       '  link                          elenca i link personali',
       '  nuovo-link "Nome"             nuovo link per un utente (il vecchio smette di andare)',
-      '  foglio AAAAMM [file.xlsx]     salva il foglio presenze di un mese',
+      '  foglio AAAAMM [file.xlsx]     salva il foglio presenze di un mese (solo se completo)',
       '  prova-notifica "Nome"         manda una notifica di prova',
       '  backup                        copia di sicurezza del database adesso'
     ].join('\n'));

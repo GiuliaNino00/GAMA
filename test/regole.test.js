@@ -1,7 +1,7 @@
 // Le regole di squadra, l'appello, gli extra, l'organico e gli utenti.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { banco, ADESSO } from './aiuto.js';
+import { banco, ADESSO, compilaMese } from './aiuto.js';
 import * as Q from '../src/dati.js';
 import * as V from '../src/viste.js';
 import { esegui } from '../src/azioni.js';
@@ -89,13 +89,18 @@ test('la domenica si parte da assente, gli altri giorni da 8 ore', () => {
   assert.equal(D.giornoDiLavoro(new Date(2026, 8, 12)), true, 'il sabato si lavora');
 });
 
-test('giorni da sistemare: 14 giorni indietro, senza domeniche', () => {
+test('giorni da sistemare: dal 1° del mese, fino al 15 anche il mese prima, senza domeniche', () => {
   const { db, matteo } = banco();
   const g = V.carica(db, matteo, 'giorni', null, ctx).dati;
   assert.equal(g[0].codice, '20260916');
   assert.equal(g[0].oggi, true);
   assert.ok(g.every((x) => D.daCodice(x.codice).getDay() !== 0));
-  assert.equal(g.length, 12, '14 giorni meno 2 domeniche');
+  assert.equal(g.at(-1).codice, '20260901', 'il 16 settembre si parte dal 1° settembre');
+  assert.equal(g.length, 14, '16 giorni meno 2 domeniche');
+  const il15 = V.carica(db, matteo, 'giorni', null, { ...ctx, adesso: new Date(2026, 8, 15, 19) }).dati;
+  assert.equal(il15.at(-1).codice, '20260801', 'fino al 15 c\'e\' anche agosto');
+  assert.equal(il15.length, 26 + 13, 'agosto (26 giorni di lavoro) + 1-15 settembre (13)');
+  assert.equal(D.inizioRecupero(new Date(2026, 0, 10)).getTime(), new Date(2025, 11, 1).getTime(), 'a gennaio si torna a dicembre');
 });
 
 test('compensi extra: ognuno solo sui suoi, cifre controllate', () => {
@@ -110,7 +115,7 @@ test('compensi extra: ognuno solo sui suoi, cifre controllate', () => {
   assert.deepEqual(meseDi(antonio).extra.map((x) => x.nome), ["D'AMORE E."]);
   assert.equal(meseDi(giuliano).extra.length, 2);
   assert.equal(meseDi(matteo).scaricabile, false);
-  assert.equal(meseDi(giuliano).scaricabile, true);
+  assert.equal(meseDi(giuliano).scaricabile, false, 'settembre non e\' completo: niente foglio');
   assert.deepEqual(V.carica(db, matteo, 'extra', null, ctx).dati.dipendenti, ['PIPERIS P.', 'PIPERIS G.', 'ZUCCARO D.']);
 });
 
@@ -209,15 +214,20 @@ test('nomi: pulizia e forma breve', () => {
   assert.equal(nomeBreve('ROSSI MARCO', ['ROSSI M.']), 'ROSSI MARCO');
 });
 
-test('i soci correggono solo gli ultimi 14 giorni, l\'amministratore anche quelli vecchi', () => {
+test('i soci sistemano il mese in corso e fino al 15 il mese prima, l\'amministratore anche quelli vecchi', () => {
   const { db, giuliano, matteo } = banco();
-  // ADESSO = 16 settembre: il limite e' il 3 settembre
-  assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260903', stati: { 'PIPERIS P.': 'ORD' } }, ctx).ok, true);
-  const vecchio = esegui(db, matteo, 'salvaAppello', { d: '20260902', stati: { 'PIPERIS P.': 'ORD' } }, ctx);
+  // ADESSO = 16 settembre: il limite e' il 1° settembre
+  assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260901', stati: { 'PIPERIS P.': 'ORD' } }, ctx).ok, true);
+  assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260901', stati: { 'PIPERIS P.': 'MEZ' } }, ctx).ok, true, 'anche correggere un giorno fatto');
+  const vecchio = esegui(db, matteo, 'salvaAppello', { d: '20260831', stati: { 'PIPERIS P.': 'ORD' } }, ctx);
   assert.equal(vecchio.ok, false);
-  assert.match(vecchio.errore, /ultimi 14 giorni.*chiedi a Giuliano/);
+  assert.match(vecchio.errore, /da martedì 1 settembre in poi.*chiedi a Giuliano/);
+  // il 15 settembre agosto e' ancora aperto, luglio no
+  const il15 = { ...ctx, adesso: new Date(2026, 8, 15, 19) };
+  assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260801', stati: { 'PIPERIS P.': 'ORD' } }, il15).ok, true);
+  assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260731', stati: { 'PIPERIS P.': 'ORD' } }, il15).ok, false);
+  assert.equal(appello(db, matteo, '20260831').ok, false);
   assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20210104', stati: { 'PIPERIS P.': 'ORD' } }, ctx).ok, false);
-  assert.equal(appello(db, matteo, '20260902').ok, false);
   assert.equal(esegui(db, giuliano, 'salvaAppello', { d: '20260801', stati: { 'PIPERIS P.': 'FER' } }, ctx).ok, true);
   assert.equal(appello(db, giuliano, '20260801').ok, true);
 });
@@ -258,8 +268,8 @@ test('plancia: oggi, due settimane giorno per giorno, numeri di settimana e mese
   assert.equal(ha.giorni.find((x) => x.codice === '20260914').stato, 'parziale');
   esegui(db, antonio, 'salvaAppello', { d: '20260914', stati: { "D'AMORE E.": 'ORD' } }, ctx);
   assert.equal(V.carica(db, giuliano, 'home', null, ctx).dati.giorni.find((x) => x.codice === '20260914').stato, 'fatto');
-  // un socio non apre i giorni oltre i 14 indietro
-  const vecchio = V.statoGiorni(db, matteo, new Date(2026, 8, 1), new Date(2026, 8, 3), ADESSO);
+  // il 16 un socio non apre piu' i giorni del mese prima
+  const vecchio = V.statoGiorni(db, matteo, new Date(2026, 7, 30), new Date(2026, 8, 1), ADESSO);
   assert.deepEqual(vecchio.map((x) => x.apribile), [false, false, true]);
 });
 
@@ -286,4 +296,40 @@ test('niente conferme sopra dati vecchi: chi salva per secondo vede la versione 
   assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260916', stati: { 'PIPERIS P.': 'ORD' }, impronta: r.dati.impronta }, ctx).ok, true);
   // senza impronta (giornate inviate dalla coda "senza campo") vince l'ultima, come prima
   assert.equal(esegui(db, giuliano, 'salvaAppello', { d: '20260916', stati: { 'PIPERIS P.': 'MEZ' } }, ctx).ok, true);
+});
+
+test('foglio del mese: solo a mese completo, solo l\'amministratore, con l\'indirizzo dell\'agenzia', () => {
+  const { db, giuliano, matteo } = banco();
+  compilaMese(db, 2026, 7, [10, 31]);
+  let m = V.carica(db, giuliano, 'mese', '202608', ctx).dati;
+  assert.deepEqual(m.daCompletare, [10, 31]);
+  assert.equal(m.scaricabile, false);
+  // una squadra sola non basta
+  Q.salvaPresenze(db, '2026-08-10', { 'PIPERIS P.': 'ORD' }, 'prova');
+  Q.salvaPresenze(db, '2026-08-31', { 'PIPERIS P.': 'ORD', "D'AMORE E.": 'FER' }, 'prova');
+  assert.deepEqual(Q.mancantiPerIlFoglio(db, 2026, 7), [10]);
+  Q.salvaPresenze(db, '2026-08-10', { "D'AMORE E.": 'ASS' }, 'prova');
+  m = V.carica(db, giuliano, 'mese', '202608', ctx).dati;
+  assert.deepEqual(m.daCompletare, []);
+  assert.equal(m.scaricabile, true);
+  assert.deepEqual(m.agenzia, { nome: 'Gama srl', email: 'gamasrl2026@gmail.com' });
+  const s = V.carica(db, matteo, 'mese', '202608', ctx).dati;
+  assert.equal(s.scaricabile, false);
+  assert.equal(s.agenzia, null, 'un socio non riceve l\'indirizzo');
+  // il mese in corso non e' completo finche' non arriva l'ultimo giorno
+  assert.ok(V.carica(db, giuliano, 'mese', '202609', ctx).dati.daCompletare.includes(30));
+});
+
+test('PRIMO_GIORNO: prima di quando si usa l\'app non si chiede niente', () => {
+  const { db, matteo } = banco();
+  process.env.PRIMO_GIORNO = '2026-09-10';
+  try {
+    const g = V.carica(db, matteo, 'giorni', null, ctx).dati;
+    assert.equal(g.at(-1).codice, '20260910', 'i giorni prima del 10 non sono da sistemare');
+    assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260909', stati: { 'PIPERIS P.': 'ORD' } }, ctx).ok, false);
+    assert.deepEqual(Q.giorniMancantiDelMese(db, matteo, 2026, 8).slice(0, 2), [10, 11]);
+    assert.equal(D.giornoDiLavoro(new Date(2026, 8, 9)), false);
+  } finally {
+    delete process.env.PRIMO_GIORNO;
+  }
 });

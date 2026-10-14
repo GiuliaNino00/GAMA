@@ -201,6 +201,10 @@ export function creaApp({ db, notifiche, urlPubblico, adesso = () => new Date() 
       const m = String(req.params.file).match(/^(\d{4})(0[1-9]|1[0-2])\.xlsx$/);
       if (!m) return res.status(400).type('text').send('Mese non valido.');
       const anno = Number(m[1]), mese0 = Number(m[2]) - 1;
+      const manca = Q.mancantiPerIlFoglio(db, anno, mese0);
+      if (manca.length) {
+        return res.status(409).type('text').send('Il foglio si prepara solo a mese completo: mancano ancora i giorni ' + manca.join(', ') + '.');
+      }
       const contenuto = await foglioMese(db, anno, mese0);
       Q.registra(db, 'FOGLIO', nomeScheda(anno, mese0) + ' scaricato da ' + req.utente.nome);
       res.set('Content-Disposition', 'attachment; filename="Presenze ' + nomeScheda(anno, mese0) + '.xlsx"');

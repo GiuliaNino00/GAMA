@@ -7,7 +7,8 @@ niente Telegram obbligatorio, niente Meta, **nessun costo**.
 - Per ora la usano **i soci e l'amministratore** (i dipendenti no).
 - Ogni socio vede **solo la sua squadra**; l'amministratore vede e modifica tutto.
 - Si installa sulla schermata Home con un tocco e manda **notifiche gratuite**:
-  alle 18:00 se l'appello non è fatto, la domenica sera il riepilogo, il primo del mese il mese chiuso.
+  alle 18:00 se l'appello non è fatto, la domenica sera il riepilogo, il primo del mese il mese chiuso
+  (oppure i giorni che mancano ancora, a chi li deve compilare).
 - Senza campo l'appello **resta sul telefono** e parte da solo appena torna la rete.
 - Si apre su una **plancia**: lo stato dell'appello di oggi, le ultime due settimane giorno per giorno
   (un tocco su un giorno rosso apre il suo appello), le ore della settimana e del mese.
@@ -125,17 +126,25 @@ l'avviso: lo tocchi, segni chi manca, *Conferma*."
   disattiva chi non deve più entrare. Vedi anche l'ultimo accesso e se ha le notifiche attive.
 - **👷 Dipendenti**: chi è senza squadra sta in cima; con **⇄** lo assegni. Attenzione: spostando
   qualcuno di squadra, il nuovo socio vede anche i suoi giorni passati.
-- I soci correggono solo gli **ultimi 14 giorni**; i giorni più vecchi (mesi già mandati all'agenzia)
-  li puoi correggere solo tu.
-- **📄 Riepilogo del mese → Scarica il foglio**: il file .xlsx da mandare all'agenzia.
+- I soci compilano e correggono **tutti i giorni del mese in corso** e, **fino al 15**, anche quelli
+  del mese prima; i giorni più vecchi (mesi già mandati all'agenzia) li puoi correggere solo tu.
+  Con `PRIMO_GIORNO` nel `.env` (es. `2026-10-01`) l'app non chiede niente dei giorni precedenti.
+- **📄 Riepilogo del mese → Foglio per l'agenzia**: il file .xlsx da mandare all'agenzia.
+  Si scarica **solo quando il mese è completo** (ogni squadra ha segnato ogni giorno di lavoro);
+  finché manca qualcosa l'app dice quali giorni. Il 1° del mese, se mancano giorni, arriva l'elenco
+  a te e ai soci interessati; appena il mese è completo ti arriva "foglio pronto". Se correggi
+  ancora qualcosa, il foglio si rifà con i dati nuovi a ogni download.
   Compare anche chi è uscito a metà mese, con i giorni che ha lavorato.
+- **Invia a Gama srl** (sotto il foglio): sul telefono apre *Condividi* con il foglio già allegato;
+  scegli *Mail* e incolla l'indirizzo (è già copiato). Sul computer scarica il foglio e apre una
+  mail già indirizzata. Nome e indirizzo stanno in `src/config.js` (`AGENZIA`).
 - Il link è la chiave: chi ce l'ha entra a nome di quella persona.
 
 Comandi utili sul server (`npm run cli -- …`, con Docker `docker compose exec presenze node src/cli.js …`):
 
 ```
 nuovo-admin "Nome"          nuovo-socio "Nome" MURATORI      link
-nuovo-link "Nome"           foglio 202610                    prova-notifica "Nome"
+nuovo-link "Nome"           foglio 202610 (solo se completo) prova-notifica "Nome"
 backup
 ```
 

@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
-import { banco, ADESSO } from './aiuto.js';
+import { banco, ADESSO, compilaMese } from './aiuto.js';
 import { creaApp } from '../src/server.js';
 import { creaNotifiche } from '../src/notifiche.js';
 
@@ -80,15 +80,19 @@ test('leggere e scrivere passando dal server', async () => {
   assert.equal(bad.status, 400);
 });
 
-test('il foglio del mese lo scarica solo l\'amministratore', async () => {
+test('il foglio del mese lo scarica solo l\'amministratore, e solo a mese completo', async () => {
   assert.equal((await fetch(link(B.matteo) + 'foglio/202609.xlsx')).status, 403);
   assert.equal((await fetch(link(B.giuliano) + 'foglio/202613.xlsx')).status, 400);
-  const r = await fetch(link(B.giuliano) + 'foglio/202609.xlsx');
+  const incompleto = await fetch(link(B.giuliano) + 'foglio/202609.xlsx');
+  assert.equal(incompleto.status, 409);
+  assert.match(await incompleto.text(), /mancano ancora i giorni 1, 2, 3/);
+  compilaMese(B.db, 2026, 7);
+  const r = await fetch(link(B.giuliano) + 'foglio/202608.xlsx');
   assert.equal(r.status, 200);
-  assert.match(r.headers.get('content-disposition'), /Presenze SETTEMBRE 2026\.xlsx/);
+  assert.match(r.headers.get('content-disposition'), /Presenze AGOSTO 2026\.xlsx/);
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(Buffer.from(await r.arrayBuffer()));
-  assert.equal(wb.worksheets[0].name, 'SETTEMBRE 2026');
+  assert.equal(wb.worksheets[0].name, 'AGOSTO 2026');
 });
 
 test('notifiche: iscrizione e prova', async () => {

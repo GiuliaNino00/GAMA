@@ -38,3 +38,12 @@ export function notificheFinte() {
     async invia(utente, messaggio) { inviate.push({ a: utente.nome, ...messaggio }); return { push: 1, falliti: 0, telegram: false }; }
   };
 }
+
+/** Compila ogni giorno di lavoro di un mese per entrambe le squadre (tranne i giorni `salta`). */
+export function compilaMese(db, anno, mese0, salta = []) {
+  for (let d = new Date(anno, mese0, 1); d.getMonth() === mese0; d = new Date(anno, mese0, d.getDate() + 1)) {
+    if (d.getDay() === 0 || salta.includes(d.getDate())) continue;
+    const k = anno + '-' + String(mese0 + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    Q.salvaPresenze(db, k, { 'PIPERIS P.': 'ORD', "D'AMORE E.": 'ORD' }, 'prova');
+  }
+}

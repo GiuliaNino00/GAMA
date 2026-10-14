@@ -3,7 +3,9 @@
  * ---------------------------------------------------------------------------
  *   18:00 nei giorni di lavoro  → promemoria dell'appello a chi non l'ha fatto
  *   domenica 20:00              → riepilogo della settimana
- *   il 1° del mese alle 8:00    → mese chiuso (all'amministratore: foglio pronto)
+ *   il 1° del mese alle 8:00    → mese chiuso: foglio pronto, oppure l'elenco dei giorni
+ *                                 ancora vuoti a chi li deve compilare
+ *   appena il mese scorso e' completo → all'amministratore: foglio pronto (una volta sola)
  *   ogni notte alle 2:00        → copia di sicurezza del database
  *
  * Ogni lavoro gira al massimo una volta al giorno. Se il server era spento
@@ -30,6 +32,13 @@ export function lavoriDovuti(adesso, ultimi) {
     const inizio = new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate(), l.ora, 0, 0);
     return adesso >= inizio && adesso.getTime() < inizio.getTime() + l.finestraOre * 3600e3;
   }).map((l) => l.nome);
+}
+
+/** Il mese prima di `ora`: { anno, mese0, cod: "202609", nome: "settembre" }. */
+function meseScorso(ora) {
+  const d = new Date(ora.getFullYear(), ora.getMonth() - 1, 1);
+  return { anno: d.getFullYear(), mese0: d.getMonth(), cod: String(d.getFullYear()) + String(d.getMonth() + 1).padStart(2, '0'),
+           nome: CFG.MESI[d.getMonth()].toLowerCase() };
 }
 
 export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new Date() }) {
@@ -73,14 +82,24 @@ export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new D
     },
 
     async mese(ora) {
-      const scorso = new Date(ora.getFullYear(), ora.getMonth() - 1, 1);
-      const nome = CFG.MESI[scorso.getMonth()].toLowerCase();
-      const cod = String(scorso.getFullYear()) + String(scorso.getMonth() + 1).padStart(2, '0');
-      await Promise.allSettled(conDipendenti().map((u) => notifiche.invia(u, {
-        titolo: '📄 Mese di ' + nome + ' chiuso',
-        testo: u.admin ? 'Il foglio presenze è pronto da scaricare per l\'agenzia.' : 'Guarda il riepilogo del mese.',
-        percorso: 'mese/' + cod
-      })));
+      const { anno, mese0, cod, nome } = meseScorso(ora);
+      const manca = Q.mancantiPerIlFoglio(db, anno, mese0);
+      if (!manca.length) Q.scriviImpostazione(db, 'foglio_pronto_' + cod, D.timbro(ora));
+      await Promise.allSettled(conDipendenti().map((u) => {
+        const suoi = u.admin ? manca : Q.giorniMancantiDelMese(db, u, anno, mese0);
+        let titolo, testo;
+        if (!suoi.length) {
+          titolo = '📄 Mese di ' + nome + ' chiuso';
+          testo = u.admin ? 'Il foglio presenze è pronto da scaricare per l\'agenzia.' : 'Guarda il riepilogo del mese.';
+        } else if (u.admin) {
+          titolo = '📄 ' + CFG.MESI[mese0].charAt(0) + nome.slice(1) + ' non è completo';
+          testo = 'Mancano i giorni ' + suoi.join(', ') + ': il foglio per l\'agenzia sarà pronto quando sarà tutto compilato.';
+        } else {
+          titolo = '📅 Mancano dei giorni di ' + nome;
+          testo = 'Giorni ' + suoi.join(', ') + ': compilali entro il ' + CFG.GIORNO_CHIUSURA_MESE_PRIMA + '.';
+        }
+        return notifiche.invia(u, { titolo, testo, percorso: 'mese/' + cod });
+      }));
     },
 
     async backup(ora) {
@@ -88,6 +107,24 @@ export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new D
       Q.sfoltisciRegistro(db);
     }
   };
+
+  /**
+   * Il mese scorso era incompleto il 1° e adesso e' tutto compilato: si avvisa
+   * l'amministratore, una volta sola. Prima delle 8 del 1° ci pensa il lavoro "mese".
+   */
+  async function foglioPronto(ora) {
+    if (ora.getDate() === 1 && ora.getHours() < CFG.ORA_MESE) return;
+    const { anno, mese0, cod, nome } = meseScorso(ora);
+    const chiave = 'foglio_pronto_' + cod;
+    if (Q.leggiImpostazione(db, chiave) || Q.mancantiPerIlFoglio(db, anno, mese0).length) return;
+    Q.scriviImpostazione(db, chiave, D.timbro(ora));
+    Q.registra(db, 'OROLOGIO', 'foglio di ' + nome + ' completo');
+    await Promise.allSettled(Q.utentiAttivi(db).filter((u) => u.admin).map((u) => notifiche.invia(u, {
+      titolo: '📄 Foglio di ' + nome + ' pronto',
+      testo: 'Tutti i giorni sono compilati: puoi scaricarlo e mandarlo a ' + CFG.AGENZIA.nome + '.',
+      percorso: 'mese/' + cod
+    })));
+  }
 
   let inCorso = false;
 
@@ -108,6 +145,11 @@ export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new D
         } catch (err) {
           Q.registra(db, 'ERRORE', 'orologio ' + nome + ': ' + ((err && err.stack) || err));
         }
+      }
+      try {
+        await foglioPronto(ora);
+      } catch (err) {
+        Q.registra(db, 'ERRORE', 'orologio foglio pronto: ' + ((err && err.stack) || err));
       }
     } finally {
       inCorso = false;

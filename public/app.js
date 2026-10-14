@@ -543,7 +543,7 @@
   // ------------------------------------------------------------------ giorni da sistemare
   VISTE.giorni = function () {
     var mio = turno;
-    intesta('Giorni', 'ultime due settimane', true); fondo(null); sagoma('lista');
+    intesta('Giorni', 'da compilare e correggere', true); fondo(null); sagoma('lista');
     carica('giorni').then(function (d) {
       if (mio !== turno) return;
       if (!d) { tornaHome(); return; }
@@ -686,16 +686,59 @@
         a.href = BASE + 'foglio/' + d.mese + '.xlsx';
         a.setAttribute('download', '');
         s.appendChild(a);
+        if (d.agenzia) s.appendChild(bottoneInvia(d, a.href));
+      } else if (S.admin) {
+        s.appendChild(nota('grigio', 'info', 'Il foglio per l’agenzia si scarica quando tutte le squadre hanno compilato tutti i giorni del mese' +
+          (d.daCompletare && d.daCompletare.length ? ': mancano ancora i giorni <b>' + d.daCompletare.join(', ') + '</b>.' : '.')));
       }
 
       s.appendChild(sezione('Per persona'));
       s.appendChild(cartaPersone(d));
       if (d.extra && d.extra.length) { s.appendChild(sezione('Compensi extra')); s.appendChild(cartaExtra(d)); }
-      if (!d.scaricabile) {
+      if (!S.admin) {
         s.appendChild(nota('grigio', 'info', 'Il foglio per l’agenzia lo prepara ' + testo(nomeAdmin()) + '. Se qualcosa non torna, diglielo prima che parta.'));
       }
     });
   };
+
+  /**
+   * "Invia a Gama srl": sul telefono si apre Condividi con il foglio gia' allegato
+   * (si sceglie Mail; l'indirizzo e' gia' copiato, basta incollarlo). Dove Condividi
+   * con i file non c'e' (computer), si scarica il foglio e si apre una mail gia' indirizzata.
+   * Il file si prepara subito: Safari apre Condividi solo se lo si chiama al tocco, senza attese.
+   */
+  function bottoneInvia(d, href) {
+    var ag = d.agenzia, nomeFile = 'Presenze ' + d.titolo.toUpperCase() + '.xlsx';
+    var oggetto = 'Presenze ' + d.titolo.toUpperCase();
+    var corpo = 'Buongiorno,\nin allegato il foglio presenze di ' + d.titolo + '.\n\n' + S.utente;
+    var file = null;
+    fetch(href, { cache: 'no-store' }).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
+      if (b && window.File) file = new File([b], nomeFile, { type: b.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    }, function () { /* senza campo: si ritenta al tocco con la mail */ });
+
+    var b = bottone('scarica', '<span class="icona">' + ico('condividi') + '</span><span><b>Invia a ' + testo(ag.nome) + '</b>' +
+      '<span>' + testo(ag.email) + '</span></span>' + ico('avanti', 'dx'), function () {
+      try { if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(ag.email).catch(function () {}); } catch (e) { /* non importa */ }
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: oggetto, text: corpo }).then(function () {
+          avvisa('Fatto. Controlla che la mail sia partita per ' + ag.email + '.');
+        }, function (e) {
+          if (!e || e.name !== 'AbortError') avvisa('Condividi non si è aperto: scarica il foglio e mandalo a ' + ag.email + '.', 1);
+        });
+        avvisa('Scegli Mail e come destinatario incolla ' + ag.email + '.');
+        return;
+      }
+      var giu = el('a'); giu.href = href; giu.setAttribute('download', nomeFile);
+      document.body.appendChild(giu); giu.click(); giu.remove();
+      setTimeout(function () {
+        location.href = 'mailto:' + ag.email + '?subject=' + encodeURIComponent(oggetto) +
+          '&body=' + encodeURIComponent(corpo + '\n\n(allegare il file ' + nomeFile + ' appena scaricato)');
+      }, 600);
+      avvisa('Il foglio è stato scaricato: allegalo alla mail che si sta aprendo.');
+    });
+    b.style.marginTop = '10px';
+    return b;
+  }
 
   // ------------------------------------------------------------------ compenso extra
   VISTE.extra = function () {
