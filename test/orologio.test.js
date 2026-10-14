@@ -116,3 +116,22 @@ test('due giri sovrapposti (notifiche lente) non mandano niente due volte', asyn
   assert.equal(mese.length, 3, 'una notifica "mese chiuso" a testa, non di piu\'');
   assert.equal(new Set(inviate).size, inviate.length);
 });
+
+test('l\'Agenzia non riceve i promemoria dell\'appello, ma riceve "foglio pronto"', async () => {
+  const { db } = banco();
+  Q.creaUtente(db, { nome: 'Studio Paghe', agenzia: true });
+  const n = notificheFinte();
+  await creaOrologio(db, { notifiche: n, adesso: () => ora(16, 18, 1) }).giro();
+  await creaOrologio(db, { notifiche: n, adesso: () => ora(20, 20, 5) }).giro();
+  assert.ok(n.inviate.length > 0);
+  assert.ok(!n.inviate.some((x) => x.a === 'Studio Paghe'), 'ne\' appello ne\' riepilogo della domenica');
+  // il 1° ottobre settembre non e' completo: all'Agenzia niente
+  await creaOrologio(db, { notifiche: n, adesso: () => new Date(2026, 9, 1, 8, 5) }).giro();
+  assert.ok(!n.inviate.some((x) => x.a === 'Studio Paghe'));
+  compilaMese(db, 2026, 8);
+  await creaOrologio(db, { notifiche: n, adesso: () => new Date(2026, 9, 2, 9, 0) }).giro();
+  const sua = n.inviate.filter((x) => x.a === 'Studio Paghe');
+  assert.equal(sua.length, 1);
+  assert.equal(sua[0].titolo, '📄 Foglio di settembre pronto');
+  assert.doesNotMatch(sua[0].testo, /mandarlo/);
+});

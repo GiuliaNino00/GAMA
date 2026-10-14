@@ -43,12 +43,14 @@ function meseScorso(ora) {
 
 export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new Date() }) {
   const conDipendenti = () => Q.utentiAttivi(db).filter((u) => Q.dipendentiDi(db, u).length);
+  // l'Agenzia non fa l'appello: niente promemoria delle 18 ne' riepilogo della domenica
+  const chiFaAppello = () => conDipendenti().filter((u) => !u.agenzia);
 
   const lavori = {
     async appello(ora) {
       const oggi = D.oggi(ora);
       const invii = [];
-      for (const u of conDipendenti()) {
+      for (const u of chiFaAppello()) {
         const vuoti = Q.giorniDaSistemare(db, u, ora);
         const oggiVuoto = vuoti.some((d) => D.chiave(d) === D.chiave(oggi));
         const altri = vuoti.length - (oggiVuoto ? 1 : 0);
@@ -70,7 +72,7 @@ export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new D
     },
 
     async settimana(ora) {
-      await Promise.allSettled(conDipendenti().map((u) => {
+      await Promise.allSettled(chiFaAppello().map((u) => {
         const r = datiSettimana(db, u, ora);
         return notifiche.invia(u, {
           titolo: '📊 La settimana',
@@ -85,12 +87,14 @@ export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new D
       const { anno, mese0, cod, nome } = meseScorso(ora);
       const manca = Q.mancantiPerIlFoglio(db, anno, mese0);
       if (!manca.length) Q.scriviImpostazione(db, 'foglio_pronto_' + cod, D.timbro(ora));
-      await Promise.allSettled(conDipendenti().map((u) => {
-        const suoi = u.admin ? manca : Q.giorniMancantiDelMese(db, u, anno, mese0);
+      // all'Agenzia si scrive solo quando il foglio e' pronto
+      await Promise.allSettled(conDipendenti().filter((u) => !u.agenzia || !manca.length).map((u) => {
+        const suoi = Q.vedeTutto(u) ? manca : Q.giorniMancantiDelMese(db, u, anno, mese0);
         let titolo, testo;
         if (!suoi.length) {
           titolo = '📄 Mese di ' + nome + ' chiuso';
-          testo = u.admin ? 'Il foglio presenze è pronto da scaricare per l\'agenzia.' : 'Guarda il riepilogo del mese.';
+          testo = u.admin ? 'Il foglio presenze è pronto da scaricare per l\'agenzia.'
+            : u.agenzia ? 'Il foglio presenze è completo e pronto da scaricare.' : 'Guarda il riepilogo del mese.';
         } else if (u.admin) {
           titolo = '📄 ' + CFG.MESI[mese0].charAt(0) + nome.slice(1) + ' non è completo';
           testo = 'Mancano i giorni ' + suoi.join(', ') + ': il foglio per l\'agenzia sarà pronto quando sarà tutto compilato.';
@@ -119,9 +123,10 @@ export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new D
     if (Q.leggiImpostazione(db, chiave) || Q.mancantiPerIlFoglio(db, anno, mese0).length) return;
     Q.scriviImpostazione(db, chiave, D.timbro(ora));
     Q.registra(db, 'OROLOGIO', 'foglio di ' + nome + ' completo');
-    await Promise.allSettled(Q.utentiAttivi(db).filter((u) => u.admin).map((u) => notifiche.invia(u, {
+    await Promise.allSettled(Q.utentiAttivi(db).filter((u) => u.admin || u.agenzia).map((u) => notifiche.invia(u, {
       titolo: '📄 Foglio di ' + nome + ' pronto',
-      testo: 'Tutti i giorni sono compilati: puoi scaricarlo e mandarlo a ' + CFG.AGENZIA.nome + '.',
+      testo: u.admin ? 'Tutti i giorni sono compilati: puoi scaricarlo e mandarlo a ' + CFG.AGENZIA.nome + '.'
+        : 'Tutti i giorni sono compilati: puoi scaricarlo.',
       percorso: 'mese/' + cod
     })));
   }

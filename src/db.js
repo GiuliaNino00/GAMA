@@ -71,7 +71,9 @@ const MIGRAZIONI = [
     tipo   TEXT NOT NULL,
     testo  TEXT NOT NULL
   );
-  `
+  `,
+  // 2 — il ruolo Agenzia: vede e corregge tutto, gestisce i dipendenti, non gli utenti
+  `ALTER TABLE utenti ADD COLUMN agenzia INTEGER NOT NULL DEFAULT 0;`
 ];
 
 /** Apre (o crea) il database e lo porta all'ultima versione della struttura. */

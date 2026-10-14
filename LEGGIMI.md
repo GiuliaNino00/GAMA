@@ -138,14 +138,19 @@ l'avviso: lo tocchi, segni chi manca, *Conferma*."
 - **Invia a Gama srl** (sotto il foglio): sul telefono apre *Condividi* con il foglio già allegato;
   scegli *Mail* e incolla l'indirizzo (è già copiato). Sul computer scarica il foglio e apre una
   mail già indirizzata. Nome e indirizzo stanno in `src/config.js` (`AGENZIA`).
+- **Agenzia** (ruolo per chi segue paghe e documenti): vede e corregge presenze ed extra di tutte
+  le squadre e di qualunque giorno, gestisce i dipendenti e scarica il foglio del mese completo.
+  **Non** vede utenti e link e non può crearne: non può togliere l'accesso a nessuno.
+  Non riceve i promemoria dell'appello, solo "foglio pronto". Si crea da *Chi usa l'app* →
+  *Aggiungi* → *Agenzia*, oppure con `nuovo-agenzia "Nome"`.
 - Il link è la chiave: chi ce l'ha entra a nome di quella persona.
 
 Comandi utili sul server (`npm run cli -- …`, con Docker `docker compose exec presenze node src/cli.js …`):
 
 ```
-nuovo-admin "Nome"          nuovo-socio "Nome" MURATORI      link
+nuovo-admin "Nome"          nuovo-socio "Nome" MURATORI      nuovo-agenzia "Nome"
 nuovo-link "Nome"           foglio 202610 (solo se completo) prova-notifica "Nome"
-backup
+link                        backup
 ```
 
 ## 7. Copie di sicurezza

@@ -45,16 +45,21 @@ export function squadraDi(v) {
  * L'amministratore vede tutti. Un socio vede SOLO la sua squadra: ne' l'altra,
  * ne' chi non ha ancora una squadra. Un socio senza squadra non vede nessuno.
  */
+/** Amministratore e Agenzia vedono e correggono tutte le squadre (gli utenti li gestisce solo l'amministratore). */
+export function vedeTutto(utente) {
+  return !!utente && (utente.admin === true || utente.agenzia === true);
+}
+
 export function puoVedere(utente, squadra) {
   if (!utente) return false;
-  if (utente.admin) return true;
+  if (vedeTutto(utente)) return true;
   return !!utente.squadra && squadra === utente.squadra;
 }
 
 /** "Muratori", "tutte le squadre"... */
 export function descriviAmbito(utente) {
   if (!utente) return '';
-  if (utente.admin) return 'tutte le squadre';
+  if (vedeTutto(utente)) return 'tutte le squadre';
   if (utente.squadra) return utente.squadra.charAt(0) + utente.squadra.slice(1).toLowerCase();
   return 'nessuna squadra assegnata';
 }
@@ -67,7 +72,7 @@ export function nomiAmministratori(db) {
 export function avvisoAmbito(db, utente) {
   if (!utente || dipendentiDi(db, utente).length) return '';
   const admin = nomiAmministratori(db).filter((n) => n !== utente.nome)[0] || "l'amministratore";
-  if (utente.admin) return 'Non c\'è ancora nessun dipendente attivo: aggiungili da 👷 Dipendenti.';
+  if (vedeTutto(utente)) return 'Non c\'è ancora nessun dipendente attivo: aggiungili da 👷 Dipendenti.';
   if (!utente.squadra) {
     return 'Non hai ancora una squadra assegnata, quindi non vedi nessun dipendente. Chiedi a ' + admin + ' di assegnartela.';
   }
@@ -84,6 +89,7 @@ function utenteDaRiga(r) {
     nome: r.nome,
     squadra: r.squadra,
     admin: r.admin === 1,
+    agenzia: r.agenzia === 1,
     attivo: r.attivo === 1,
     chiave: r.chiave,
     telegram: r.telegram_chat_id,
@@ -117,11 +123,13 @@ export function tuttiUtenti(db) {
   return db.prepare('SELECT * FROM utenti ORDER BY attivo DESC, admin DESC, id').all().map(utenteDaRiga);
 }
 
-export function creaUtente(db, { nome, squadra = '', admin = false, telegram = '' }) {
+export function creaUtente(db, { nome, squadra = '', admin = false, agenzia = false, telegram = '' }) {
+  if (admin) agenzia = false;
+  if (admin || agenzia) squadra = '';
   const info = db.prepare(
-    'INSERT INTO utenti (nome, squadra, admin, attivo, chiave, telegram_chat_id, creato) VALUES (?, ?, ?, 1, ?, ?, ?)'
-  ).run(nome, squadraDi(squadra), admin ? 1 : 0, nuovaChiave(), String(telegram || ''), D.timbro());
-  registra(db, 'UTENTI', 'creato ' + nome + (admin ? ' (amministratore)' : squadra ? ' (' + squadraDi(squadra) + ')' : ''));
+    'INSERT INTO utenti (nome, squadra, admin, agenzia, attivo, chiave, telegram_chat_id, creato) VALUES (?, ?, ?, ?, 1, ?, ?, ?)'
+  ).run(nome, squadraDi(squadra), admin ? 1 : 0, agenzia ? 1 : 0, nuovaChiave(), String(telegram || ''), D.timbro());
+  registra(db, 'UTENTI', 'creato ' + nome + (admin ? ' (amministratore)' : agenzia ? ' (agenzia)' : squadra ? ' (' + squadraDi(squadra) + ')' : ''));
   return utentePerId(db, info.lastInsertRowid);
 }
 
@@ -130,6 +138,7 @@ export function aggiornaUtente(db, id, campi) {
   const set = [], valori = [];
   if ('squadra' in campi) { set.push('squadra = ?'); valori.push(squadraDi(campi.squadra)); }
   if ('admin' in campi) { set.push('admin = ?'); valori.push(campi.admin ? 1 : 0); }
+  if ('agenzia' in campi) { set.push('agenzia = ?'); valori.push(campi.agenzia ? 1 : 0); }
   if ('attivo' in campi) { set.push('attivo = ?'); valori.push(campi.attivo ? 1 : 0); }
   if ('telegram' in campi) { set.push('telegram_chat_id = ?'); valori.push(String(campi.telegram || '')); }
   if ('nome' in campi) { set.push('nome = ?'); valori.push(campi.nome); }
@@ -302,7 +311,7 @@ export function giorniCompilatiPer(db, utente, dal, al) {
   const righe = presenzeIntervallo(db, dal, al);
   const out = {};
 
-  if (!utente || !utente.admin) {
+  if (!vedeTutto(utente)) {
     const miei = new Set(attivi.filter((d) => puoVedere(utente, d.squadra)).map((d) => d.id));
     righe.forEach((p) => { if (miei.has(p.dipendenteId)) out[p.data] = true; });
     return out;

@@ -32,7 +32,7 @@ export function esegui(db, utente, azione, carico, { urlPubblico = '', adesso = 
  * i mesi gia' chiusi li tocca l'amministratore.
  */
 export function troppoVecchioPer(db, utente, data, adesso) {
-  if (utente.admin) return '';
+  if (Q.vedeTutto(utente)) return '';
   const limite = D.inizioRecupero(adesso);
   if (data >= limite) return '';
   const admin = Q.nomiAmministratori(db)[0] || 'l\'amministratore';
@@ -99,9 +99,9 @@ function nuovoDipendente(db, utente, c) {
   const completo = nomePulito(c.completo);
   if (!completo) return { ok: false, errore: 'Serve cognome e nome, solo lettere: per esempio ROSSI MARIO.' };
 
-  // Un socio assume sempre nella propria squadra. L'amministratore sceglie.
+  // Un socio assume sempre nella propria squadra. L'amministratore (e l'Agenzia) sceglie.
   let squadra;
-  if (utente.admin) {
+  if (Q.vedeTutto(utente)) {
     squadra = Q.squadraDi(c.squadra);
     if (squadra && !CFG.SQUADRE.includes(squadra)) return { ok: false, errore: 'Squadra sconosciuta.' };
   } else {
@@ -135,7 +135,7 @@ function cambiaAttivo(db, utente, c) {
 }
 
 function cambiaSquadra(db, utente, c) {
-  if (!utente.admin) return { ok: false, errore: 'Solo l\'amministratore può cambiare squadra.' };
+  if (!Q.vedeTutto(utente)) return { ok: false, errore: 'Solo l\'amministratore può cambiare squadra.' };
   const nome = String(c.nome || '').trim();
   const squadra = Q.squadraDi(c.squadra);
   if (squadra && !CFG.SQUADRE.includes(squadra)) return { ok: false, errore: 'Squadra sconosciuta.' };
@@ -155,10 +155,11 @@ function nuovoUtente(db, utente, c, urlPubblico) {
   if (!nome) return { ok: false, errore: 'Scrivi un nome (solo lettere, senza simboli).' };
   if (Q.utentePerNome(db, nome)) return { ok: false, errore: 'C\'è già qualcuno con questo nome.' };
   const admin = c.admin === true;
-  const squadra = admin ? '' : Q.squadraDi(c.squadra);
-  if (!admin && !CFG.SQUADRE.includes(squadra)) return { ok: false, errore: 'Scegli la squadra.' };
+  const agenzia = !admin && c.agenzia === true;
+  const squadra = admin || agenzia ? '' : Q.squadraDi(c.squadra);
+  if (!admin && !agenzia && !CFG.SQUADRE.includes(squadra)) return { ok: false, errore: 'Scegli la squadra.' };
 
-  const nuovo = Q.creaUtente(db, { nome, squadra, admin });
+  const nuovo = Q.creaUtente(db, { nome, squadra, admin, agenzia });
   return { ok: true, messaggio: nome + ' può usare l\'app: mandagli il suo link.', link: Q.linkUtente(urlPubblico, nuovo), id: nuovo.id };
 }
 
@@ -174,6 +175,7 @@ function aggiornaUtente(db, utente, c) {
     campi.squadra = sq;
   }
   if ('admin' in c) campi.admin = c.admin === true;
+  if (campi.admin) campi.agenzia = false;                  // un ruolo solo
   if ('attivo' in c) campi.attivo = c.attivo === true;
 
   // Non ci si chiude fuori da soli.

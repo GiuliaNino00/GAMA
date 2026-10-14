@@ -333,3 +333,45 @@ test('PRIMO_GIORNO: prima di quando si usa l\'app non si chiede niente', () => {
     delete process.env.PRIMO_GIORNO;
   }
 });
+
+test('Agenzia: vede e corregge tutto, gestisce i dipendenti, ma non utenti e link', () => {
+  const { db, giuliano, matteo } = banco();
+  const ag = Q.creaUtente(db, { nome: 'Studio Paghe', agenzia: true });
+  assert.equal(ag.agenzia, true);
+  assert.equal(ag.admin, false);
+  assert.equal(Q.descriviAmbito(ag), 'tutte le squadre');
+  assert.equal(nomi(appello(db, ag)).length, 6, 'tutte le squadre, anche chi non ne ha');
+  // presenze ed extra, anche di mesi vecchi
+  assert.equal(esegui(db, ag, 'salvaAppello', { d: '20260701', stati: { 'PIPERIS P.': 'FER', "D'AMORE E.": 'ORD' } }, ctx).ok, true);
+  assert.equal(esegui(db, ag, 'salvaExtra', { dipendente: "D'AMORE E.", importo: 30 }, ctx).ok, true);
+  // dipendenti
+  assert.equal(esegui(db, ag, 'nuovoDipendente', { completo: 'ROSSI MARIO', squadra: 'CARPENTIERI' }, ctx).ok, true);
+  assert.equal(esegui(db, ag, 'cambiaSquadra', { nome: 'STRIPPOLI F.', squadra: 'MURATORI' }, ctx).ok, true);
+  assert.equal(esegui(db, ag, 'cambiaAttivo', { nome: 'ZUCCARO D.', attivo: false }, ctx).ok, true);
+  // utenti e link: no
+  assert.equal(V.carica(db, ag, 'utenti', null, ctx).ok, false);
+  assert.equal(esegui(db, ag, 'nuovoUtente', { nome: 'Intruso', admin: true }, ctx).ok, false);
+  assert.equal(esegui(db, ag, 'aggiornaUtente', { id: giuliano.id, attivo: false }, ctx).ok, false);
+  assert.equal(esegui(db, ag, 'aggiornaUtente', { id: ag.id, admin: true }, ctx).ok, false, 'non si promuove da solo');
+  assert.equal(esegui(db, ag, 'rigeneraLink', { id: giuliano.id }, ctx).ok, false);
+  assert.equal(Q.utentePerId(db, giuliano.id).chiave, giuliano.chiave, 'il link dell\'amministratore non cambia');
+  // il foglio si', il pulsante "Invia all'agenzia" no
+  const m = V.carica(db, ag, 'mese', '202609', ctx).dati;
+  assert.ok(m.daCompletare.length > 0);
+  assert.equal(m.agenzia, null);
+  // nella pagina iniziale non c'e' nessun link di nessuno
+  const a = V.avvio(db, ag, { adesso: ADESSO });
+  assert.deepEqual([a.admin, a.agenzia, a.tutto], [false, true, true]);
+  assert.ok(![giuliano, matteo].some((u) => JSON.stringify(a).includes(u.chiave)));
+});
+
+test('l\'amministratore crea un utente Agenzia; promosso ad amministratore perde il ruolo Agenzia', () => {
+  const { db, giuliano } = banco();
+  const r = esegui(db, giuliano, 'nuovoUtente', { nome: 'Studio Paghe', agenzia: true }, ctx);
+  assert.equal(r.ok, true);
+  const ag = Q.utentePerId(db, r.id);
+  assert.deepEqual([ag.agenzia, ag.admin, ag.squadra], [true, false, '']);
+  assert.equal(V.carica(db, giuliano, 'utenti', null, ctx).dati.find((u) => u.id === ag.id).agenzia, true);
+  assert.equal(esegui(db, giuliano, 'aggiornaUtente', { id: ag.id, admin: true }, ctx).ok, true);
+  assert.deepEqual([Q.utentePerId(db, ag.id).admin, Q.utentePerId(db, ag.id).agenzia], [true, false]);
+});

@@ -69,7 +69,7 @@ export function statoGiorni(db, utente, dal, al, adesso = new Date()) {
   const fatti = Q.giorniCompilatiPer(db, utente, dal, al);
   const conRighe = {};
   for (const p of Q.presenzeIntervallo(db, dal, al)) if (visibili.has(p.dipendenteId)) conRighe[p.data] = true;
-  const limite = utente.admin ? null : D.inizioRecupero(adesso);
+  const limite = Q.vedeTutto(utente) ? null : D.inizioRecupero(adesso);
   const out = [];
   for (let d = new Date(dal); d <= al; d = D.aggiungiGiorni(d, 1)) {
     const k = D.chiave(d);
@@ -139,11 +139,12 @@ export function datiMese(db, anno, mese0, utente, adesso = new Date()) {
   r.extra = Object.keys(extra).filter((n) => miei.has(n))
     .map((n) => ({ nome: n, importo: extra[n].totale, note: extra[n].note.join('; ') }));
   r.mese = String(anno) + String(mese0 + 1).padStart(2, '0');
-  // il foglio per l'agenzia: solo l'amministratore, e solo a mese tutto compilato
-  const admin = !!(utente && utente.admin);
-  r.daCompletare = admin ? Q.mancantiPerIlFoglio(db, anno, mese0) : [];
-  r.scaricabile = admin && !r.daCompletare.length;
-  r.agenzia = admin ? CFG.AGENZIA : null;
+  // il foglio per l'agenzia: amministratore e Agenzia, e solo a mese tutto compilato;
+  // il pulsante "Invia all'agenzia" serve solo all'amministratore
+  const tutto = Q.vedeTutto(utente);
+  r.daCompletare = tutto ? Q.mancantiPerIlFoglio(db, anno, mese0) : [];
+  r.scaricabile = tutto && !r.daCompletare.length;
+  r.agenzia = utente && utente.admin ? CFG.AGENZIA : null;
   // il calendario del mese: quante caselle vuote prima del giorno 1 (lunedi' = 0)
   r.calendario = { vuoti: (dal.getDay() + 6) % 7, giorni: statoGiorni(db, utente, dal, al, adesso) };
   return r;
@@ -217,6 +218,7 @@ export function datiUtenti(db, urlPubblico) {
     nome: u.nome,
     squadra: u.squadra,
     admin: u.admin,
+    agenzia: u.agenzia,
     attivo: u.attivo,
     link: Q.linkUtente(urlPubblico, u),
     ultimoAccesso: u.ultimoAccesso || '',
@@ -232,6 +234,8 @@ export function avvio(db, utente, { vapid = '', adesso = new Date() } = {}) {
     utente: utente.nome,
     ambito: Q.descriviAmbito(utente),
     admin: utente.admin,
+    agenzia: utente.agenzia,
+    tutto: Q.vedeTutto(utente),
     squadra: utente.squadra,
     squadre: CFG.SQUADRE,
     ciclo: CFG.CICLO,

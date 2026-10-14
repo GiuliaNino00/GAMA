@@ -197,7 +197,7 @@ export function creaApp({ db, notifiche, urlPubblico, adesso = () => new Date() 
 
   u.get('/foglio/:file', async (req, res, next) => {
     try {
-      if (!req.utente.admin) return res.status(403).type('text').send('Solo l\'amministratore scarica il foglio del mese.');
+      if (!Q.vedeTutto(req.utente)) return res.status(403).type('text').send('Solo l\'amministratore e l\'agenzia scaricano il foglio del mese.');
       const m = String(req.params.file).match(/^(\d{4})(0[1-9]|1[0-2])\.xlsx$/);
       if (!m) return res.status(400).type('text').send('Mese non valido.');
       const anno = Number(m[1]), mese0 = Number(m[2]) - 1;

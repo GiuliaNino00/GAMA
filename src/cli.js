@@ -3,6 +3,7 @@
  * ---------------------------------------------------------------------------
  *   npm run cli -- nuovo-admin "Giuliano"
  *   npm run cli -- nuovo-socio "Matteo" MURATORI
+ *   npm run cli -- nuovo-agenzia "Studio Rossi" (vede e corregge tutto, gestisce i dipendenti, non gli utenti)
  *   npm run cli -- link                      (elenca i link personali)
  *   npm run cli -- nuovo-link "Matteo"       (il vecchio smette di funzionare)
  *   npm run cli -- foglio 202609 [file.xlsx] (salva il foglio di settembre 2026, solo se completo;
@@ -25,19 +26,20 @@ const [comando, ...arg] = process.argv.slice(2);
 
 function esci(msg) { console.log(msg); process.exit(1); }
 function mostraLink(u) {
-  console.log(u.nome + (u.admin ? ' [amministratore]' : ' [' + (u.squadra || 'senza squadra').toLowerCase() + ']') + '\n  ' + Q.linkUtente(E.URL_PUBBLICO, u));
+  console.log(u.nome + (u.admin ? ' [amministratore]' : u.agenzia ? ' [agenzia]' : ' [' + (u.squadra || 'senza squadra').toLowerCase() + ']') + '\n  ' + Q.linkUtente(E.URL_PUBBLICO, u));
 }
 
 switch (comando) {
   case 'nuovo-admin':
+  case 'nuovo-agenzia':
   case 'nuovo-socio': {
     const nome = nomeUtente(arg[0]);
     if (!nome) esci('Scrivi il nome tra virgolette, per esempio: npm run cli -- ' + comando + ' "Giuliano"');
     if (Q.utentePerNome(db, nome)) esci('Esiste già un utente con questo nome: usa "link" per vedere il suo link.');
-    const admin = comando === 'nuovo-admin';
-    const squadra = admin ? '' : Q.squadraDi(arg[1]);
-    if (!admin && !CFG.SQUADRE.includes(squadra)) esci('Indica la squadra: ' + CFG.SQUADRE.join(' oppure '));
-    mostraLink(Q.creaUtente(db, { nome, squadra, admin }));
+    const admin = comando === 'nuovo-admin', agenzia = comando === 'nuovo-agenzia';
+    const squadra = admin || agenzia ? '' : Q.squadraDi(arg[1]);
+    if (!admin && !agenzia && !CFG.SQUADRE.includes(squadra)) esci('Indica la squadra: ' + CFG.SQUADRE.join(' oppure '));
+    mostraLink(Q.creaUtente(db, { nome, squadra, admin, agenzia }));
     break;
   }
   case 'link':
@@ -79,6 +81,7 @@ switch (comando) {
       'Comandi:',
       '  nuovo-admin "Nome"            crea un amministratore e stampa il suo link',
       '  nuovo-socio "Nome" SQUADRA    crea un socio (' + CFG.SQUADRE.join(' / ') + ')',
+      '  nuovo-agenzia "Nome"          crea un utente Agenzia (tutto tranne utenti e link)',
       '  link                          elenca i link personali',
       '  nuovo-link "Nome"             nuovo link per un utente (il vecchio smette di andare)',
       '  foglio AAAAMM [file.xlsx]     salva il foglio presenze di un mese (solo se completo)',

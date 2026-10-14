@@ -328,7 +328,7 @@
     }
     c.appendChild(el('div', 'legenda',
       '<span><i style="background:var(--verde)"></i>fatto</span>' +
-      (S.admin ? '<span><i style="background:var(--ambra)"></i>in parte</span>' : '') +
+      (S.tutto ? '<span><i style="background:var(--ambra)"></i>in parte</span>' : '') +
       '<span><i style="box-shadow:inset 0 0 0 2px var(--rosso)"></i>da fare</span>'));
     return c;
   }
@@ -481,7 +481,7 @@
       if (!r.ok && r.rete) {
         metteInSospeso({ d: A.codice, giorno: A.giorno, stati: stati });
         avvisa('Non riesco a inviarla adesso: la giornata è salvata sul telefono e parte da sola appena possibile.');
-        if (A.codice === S.oggi) { S.home.oggi.giaFatto = S.utente; S.home.oggi.completo = !S.admin; }
+        if (A.codice === S.oggi) { S.home.oggi.giaFatto = S.utente; S.home.oggi.completo = !S.tutto; }
         setTimeout(tornaHome, 1800);
         return;
       }
@@ -576,7 +576,7 @@
       '<div class="cifra">' + d.oreTotali + '<small>ore</small></div>' +
       '<div class="righe"><span><b>' + gg + '</b> giornate</span>' +
       (extra ? '<span><b>' + euro(extra) + '</b> di extra</span>' : '') +
-      (d.mancanti && d.mancanti.length ? '<span style="color:var(--rosso)"><b style="color:inherit">' + d.mancanti.length + '</b> ' + (S.admin ? 'da completare' : d.mancanti.length === 1 ? 'giorno vuoto' : 'giorni vuoti') + '</span>' : '') +
+      (d.mancanti && d.mancanti.length ? '<span style="color:var(--rosso)"><b style="color:inherit">' + d.mancanti.length + '</b> ' + (S.tutto ? 'da completare' : d.mancanti.length === 1 ? 'giorno vuoto' : 'giorni vuoti') + '</span>' : '') +
       '</div>');
   }
 
@@ -588,7 +588,7 @@
       var pct = function (n) { return Math.min(100, Math.round(n / pieno * 100)) + '%'; };
       var r = el('div', 'persona' + (p.gg || p.fer || p.fes ? '' : ' vuota-p'),
         avatar(p.nome) +
-        '<span class="chi">' + testo(p.nome) + (S.admin && p.squadra ? ' <small>· ' + testo(etichettaSq(p.squadra)) + '</small>' : '') + '</span>' +
+        '<span class="chi">' + testo(p.nome) + (S.tutto && p.squadra ? ' <small>· ' + testo(etichettaSq(p.squadra)) + '</small>' : '') + '</span>' +
         '<span class="val">' + p.gg + ' gg <small>· ' + p.ore + ' h</small></span>' +
         '<span class="barra"><i style="width:' + pct(interi) + '"></i><i class="mezza" style="width:' + pct(p.mezze) + '"></i>' +
         '<i class="ferie" style="width:' + pct(p.fer) + '"></i></span>');
@@ -616,8 +616,8 @@
 
   function mancanti(d) {
     if (!d.mancanti || !d.mancanti.length) return null;
-    return nota('rosso', 'avviso', (S.admin ? 'Giorni da completare' : 'Giorni senza presenze') + ': <b>' + d.mancanti.join(', ') +
-      '</b>. ' + (S.admin ? 'Almeno una squadra non ha ancora segnato le presenze.' : 'Le ore di quei giorni non ci sono ancora.'));
+    return nota('rosso', 'avviso', (S.tutto ? 'Giorni da completare' : 'Giorni senza presenze') + ': <b>' + d.mancanti.join(', ') +
+      '</b>. ' + (S.tutto ? 'Almeno una squadra non ha ancora segnato le presenze.' : 'Le ore di quei giorni non ci sono ancora.'));
   }
 
   VISTE.settimana = function () {
@@ -687,7 +687,7 @@
         a.setAttribute('download', '');
         s.appendChild(a);
         if (d.agenzia) s.appendChild(bottoneInvia(d, a.href));
-      } else if (S.admin) {
+      } else if (S.tutto) {
         s.appendChild(nota('grigio', 'info', 'Il foglio per l’agenzia si scarica quando tutte le squadre hanno compilato tutti i giorni del mese' +
           (d.daCompletare && d.daCompletare.length ? ': mancano ancora i giorni <b>' + d.daCompletare.join(', ') + '</b>.' : '.')));
       }
@@ -695,7 +695,7 @@
       s.appendChild(sezione('Per persona'));
       s.appendChild(cartaPersone(d));
       if (d.extra && d.extra.length) { s.appendChild(sezione('Compensi extra')); s.appendChild(cartaExtra(d)); }
-      if (!S.admin) {
+      if (!S.tutto) {
         s.appendChild(nota('grigio', 'info', 'Il foglio per l’agenzia lo prepara ' + testo(nomeAdmin()) + '. Se qualcosa non torna, diglielo prima che parta.'));
       }
     });
@@ -813,21 +813,21 @@
   function disegnaOrganico() {
     var d = S.organico;
     var attivi = d.filter(function (x) { return x.attivo; }).length;
-    intesta('Dipendenti', attivi + ' attivi su ' + d.length + (S.admin ? '' : ' · ' + S.ambito), true);
+    intesta('Dipendenti', attivi + ' attivi su ' + d.length + (S.tutto ? '' : ' · ' + S.ambito), true);
     var s = schermo();
-    if (!S.admin) {
+    if (!S.tutto) {
       s.appendChild(nota('grigio', 'info', 'Qui vedi solo la squadra <b>' + testo(S.ambito) + '</b>. ' +
         'Per cambiare squadra o ruolo a una persona contatta ' + testo(nomeAdmin()) + '.'));
     }
     if (!d.length && S.avviso) s.appendChild(nota('giallo', 'avviso', testo(S.avviso)));
-    if (S.admin && d.some(function (x) { return x.attivo && !x.squadra; })) {
+    if (S.tutto && d.some(function (x) { return x.attivo && !x.squadra; })) {
       s.appendChild(nota('giallo', 'avviso', 'Chi è <b>senza squadra</b> non compare nell’appello di nessun socio: tocca la sua etichetta per assegnarlo.'));
     }
     s.appendChild(el('p', 'aiuto', 'L’interruttore dice se lavora con voi. Chi non è attivo esce dall’appello, ma le sue presenze passate restano.'));
 
     var lista = el('div', 'lista'), ultima = null;
     d.forEach(function (x) {
-      if (S.admin && (x.squadra || '') !== ultima) {
+      if (S.tutto && (x.squadra || '') !== ultima) {
         ultima = x.squadra || '';
         lista.appendChild(el('div', 'gruppo', ultima ? testo(ultima) : 'Senza squadra'));
       }
@@ -835,7 +835,7 @@
       r.setAttribute('data-s', x.attivo ? 'ORD' : 'ASS');
       r.innerHTML = avatar(x.nome);
       var nomeEl = el('div', 'nome', testo(x.nome));
-      if (S.admin) {
+      if (S.tutto) {
         nomeEl.appendChild(el('br'));
         nomeEl.appendChild(bottone('cambia' + (x.squadra ? '' : ' vuota'), ico('scambia', 'i-xs') + testo(etichettaSq(x.squadra)), function () {
           var i = S.squadre.indexOf(x.squadra);
@@ -878,14 +878,14 @@
   }
 
   VISTE.nuovoDipendente = function () {
-    intesta('Nuovo dipendente', S.admin ? '' : S.ambito, true);
+    intesta('Nuovo dipendente', S.tutto ? '' : S.ambito, true);
     var s = schermo();
     s.appendChild(el('div', 'campo', '<label for="nuovoNome">Cognome e nome</label>' +
       '<input id="nuovoNome" type="text" placeholder="ROSSI MARIO" autocapitalize="characters" autocomplete="off">'));
     s.appendChild(el('p', 'aiuto', 'Sul foglio comparirà nella forma breve, per esempio <b>ROSSI M.</b>' +
-      (S.admin ? '' : ' Entra nella squadra <b>' + testo(S.ambito) + '</b>.')));
-    var sqScelta = S.admin ? S.squadre[0] : S.squadra;
-    if (S.admin) {
+      (S.tutto ? '' : ' Entra nella squadra <b>' + testo(S.ambito) + '</b>.')));
+    var sqScelta = S.tutto ? S.squadre[0] : S.squadra;
+    if (S.tutto) {
       s.appendChild(sezione('In quale squadra'));
       s.appendChild(scelte(S.squadre.map(function (sq) { return { etichetta: etichettaSq(sq), valore: sq }; }), sqScelta,
         function (v) { sqScelta = v; }));
@@ -952,10 +952,10 @@
 
       lista.forEach(function (u) {
         var c = el('section', 'carta utente' + (u.attivo ? '' : ' spento'));
-        var ruolo = u.admin ? 'Amministratore' : (u.squadra ? etichettaSq(u.squadra) : 'senza squadra');
+        var ruolo = u.admin ? 'Amministratore' : u.agenzia ? 'Agenzia' : (u.squadra ? etichettaSq(u.squadra) : 'senza squadra');
         c.appendChild(el('div', 'u-testa', avatar(u.nome) +
           '<span class="u-nome">' + testo(u.nome) + (u.nome === S.utente ? ' <small>sei tu</small>' : '') + '</span>' +
-          '<span class="badge' + (u.admin ? ' admin' : '') + '">' + testo(ruolo) + '</span>'));
+          '<span class="badge' + (u.admin || u.agenzia ? ' admin' : '') + '">' + testo(ruolo) + '</span>'));
         c.appendChild(el('div', 'u-info',
           (u.attivo ? '' : '<span>' + ico('chiudi', 'i-xs') + 'non attivo</span>') +
           '<span>' + ico('orologio', 'i-xs') + (u.ultimoAccesso ? 'ultimo accesso ' + testo(u.ultimoAccesso.slice(8, 10) + '/' + u.ultimoAccesso.slice(5, 7) + ' ' + u.ultimoAccesso.slice(11, 16)) : 'non ha ancora aperto l’app') + '</span>' +
@@ -965,7 +965,7 @@
         if (u.attivo) {
           az.appendChild(bottone('mini', ico('messaggio') + 'WhatsApp', function () { whatsapp(u.nome, u.link); }));
           az.appendChild(bottone('mini', ico('copia') + 'Copia link', function () { copiaLink(u.link); }));
-          if (!u.admin) {
+          if (!u.admin && !u.agenzia) {
             az.appendChild(bottone('mini', ico('scambia') + testo(etichettaSq(u.squadra)), function () {
               var i = S.squadre.indexOf(u.squadra);
               var prossima = S.squadre[(i + 1) % S.squadre.length];
@@ -1006,16 +1006,18 @@
     s.appendChild(sezione('Cosa vede'));
     var scelta = S.squadre[0];
     var opzioni = S.squadre.map(function (sq) { return { etichetta: etichettaSq(sq), valore: sq }; });
+    opzioni.push({ etichetta: 'Agenzia', valore: '__AGENZIA__', icona: 'foglio' });
     opzioni.push({ etichetta: 'Amministratore', valore: '__ADMIN__', icona: 'scudo' });
     s.appendChild(scelte(opzioni, scelta, function (v) { scelta = v; }));
-    s.appendChild(el('p', 'aiuto', 'Un socio vede solo la <b>sua squadra</b>; l’amministratore vede e modifica tutto.'));
+    s.appendChild(el('p', 'aiuto', 'Un socio vede solo la <b>sua squadra</b>. L’<b>agenzia</b> vede e corregge tutte le squadre, gestisce i dipendenti e scarica il foglio, ma non vede utenti e link. L’amministratore vede e modifica tutto.'));
     fondo('<button class="grosso" id="salvaUtente" type="button">' + ico('piu') + 'Crea il suo link</button>');
     $('nomeUtente').focus();
     $('salvaUtente').addEventListener('click', function () {
       var nome = String($('nomeUtente').value || '').trim();
       if (nome.length < 2) { avvisa('Scrivi il nome.', 1); return; }
       var b = this; b.disabled = true;
-      var carico = scelta === '__ADMIN__' ? { nome: nome, admin: true } : { nome: nome, squadra: scelta };
+      var carico = scelta === '__ADMIN__' ? { nome: nome, admin: true }
+        : scelta === '__AGENZIA__' ? { nome: nome, agenzia: true } : { nome: nome, squadra: scelta };
       azione('nuovoUtente', carico).then(function (r) {
         b.disabled = false;
         if (!r.ok) { avvisa(r.errore, 1); return; }
