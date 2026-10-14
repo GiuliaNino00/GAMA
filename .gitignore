@@ -1,0 +1,5 @@
+node_modules/
+dati/
+.env
+*.xlsx
+!test/**/*.xlsx

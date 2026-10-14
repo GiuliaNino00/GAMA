@@ -1,0 +1,35 @@
+# PRESENZE GAMA — avvio con Docker
+#   1. copia .env.esempio in .env e scrivi il tuo URL_PUBBLICO
+#   2. docker compose up -d --build
+#   3. docker compose exec presenze node src/cli.js nuovo-admin "Giuliano"
+#
+# I dati restano nella cartella ./dati accanto a questo file (database + backup).
+
+services:
+  presenze:
+    build: .
+    restart: unless-stopped
+    init: true          # passa il segnale di stop all'app, che chiude il database in ordine
+    env_file: .env
+    environment:
+      CARTELLA_DATI: /dati
+      PORTA: "3000"
+    volumes:
+      - ./dati:/dati
+    ports:
+      # solo dal server stesso: da fuori si entra in https (Caddy o tunnel, vedi LEGGIMI)
+      - "127.0.0.1:3000:3000"
+
+  # ---- FACOLTATIVO: https automatico con Caddy, se il server ha un indirizzo pubblico
+  # e un nome di dominio che punta a lui. Togli i commenti e scrivi il dominio nel Caddyfile.
+  # caddy:
+  #   image: caddy:2
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - ./dati/caddy:/data
+  #   depends_on:
+  #     - presenze

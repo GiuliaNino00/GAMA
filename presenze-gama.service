@@ -1,0 +1,24 @@
+# PRESENZE GAMA — servizio systemd (per chi installa senza Docker)
+#   sudo cp presenze-gama.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now presenze-gama
+#   journalctl -u presenze-gama -f        (per vedere cosa fa)
+#
+# Presuppone il codice in /opt/presenze-gama, un utente "presenze" proprietario
+# della cartella, e il file /opt/presenze-gama/.env
+
+[Unit]
+Description=Presenze GAMA
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=presenze
+WorkingDirectory=/opt/presenze-gama
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node --env-file=/opt/presenze-gama/.env src/server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

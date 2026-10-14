@@ -1,0 +1,5 @@
+# Il server e' Linux: tutto il testo resta con fine riga LF, anche se si lavora da Windows
+* text=auto eol=lf
+*.png binary
+*.xlsx binary
+*.sqlite binary

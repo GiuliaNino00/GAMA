@@ -1,0 +1,5 @@
+# Sostituisci con il tuo dominio. Caddy ottiene e rinnova da solo il certificato https (gratis).
+presenze.tuodominio.it {
+	encode gzip
+	reverse_proxy presenze:3000
+}
