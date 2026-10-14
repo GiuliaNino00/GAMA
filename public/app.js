@@ -269,7 +269,7 @@
       ['euro', 'ambra', 'Compenso extra', 'una cifra in più a qualcuno', function () { vai('extra'); }],
       ['persone', '', 'Dipendenti', 'chi entra, chi esce', function () { vai('dipendenti'); }]
     ];
-    if (S.admin) tessere.push(['scudo', '', 'Chi usa l’app', 'soci, squadre e link', function () { vai('utenti'); }]);
+    if (S.admin) tessere.push(['scudo', '', 'Chi usa l’app', 'soci, agenzia e link', function () { vai('utenti'); }]);
     tessere.push([iscritto ? 'campana' : 'campanaNo', iscritto ? 'verde' : '', 'Notifiche', statoNotificheTesto(), function () { vai('notifiche'); }]);
     tessere.forEach(function (x, i) {
       var larga = tessere.length % 2 === 1 && i === tessere.length - 1;
@@ -993,14 +993,14 @@
         s.appendChild(c);
       });
 
-      fondo('<button class="grosso blu" id="nuovoUtente" type="button">' + ico('piu') + 'Aggiungi un socio</button>');
+      fondo('<button class="grosso blu" id="nuovoUtente" type="button">' + ico('piu') + 'Aggiungi una persona (socio o agenzia)</button>');
       $('nuovoUtente').addEventListener('click', function () { vai('nuovoUtente'); });
     });
   };
 
   VISTE.nuovoUtente = function () {
     if (!S.admin) { tornaHome(); return; }
-    intesta('Nuovo socio', '', true);
+    intesta('Nuova persona', '', true);
     var s = schermo();
     s.appendChild(el('div', 'campo', '<label for="nomeUtente">Nome</label><input id="nomeUtente" type="text" placeholder="Matteo" autocomplete="off">'));
     s.appendChild(sezione('Cosa vede'));
@@ -1021,7 +1021,7 @@
       azione('nuovoUtente', carico).then(function (r) {
         b.disabled = false;
         if (!r.ok) { avvisa(r.errore, 1); return; }
-        intesta('Nuovo socio', nome, true);
+        intesta('Nuova persona', nome, true);
         var s2 = schermo();
         s2.appendChild(el('section', 'carta stato-grande ok', '<div class="cerchio">' + ico('spunta') + '</div>' +
           '<h2>' + testo(nome) + ' può entrare</h2><p>Mandagli il suo link personale.</p>'));
