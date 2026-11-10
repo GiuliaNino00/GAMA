@@ -16,7 +16,8 @@ niente Telegram obbligatorio, niente Meta, **nessun costo**.
 - **Leggera e veloce**: la prima apertura scarica circa 23 KB; poi stile e codice restano sul telefono.
 - Se due persone toccano la stessa giornata, chi conferma per secondo **vede prima la versione nuova**:
   nessuno sovrascrive il lavoro dell'altro senza accorgersene.
-- Nell'appello: 8 ore, assente, 4 ore, **pioggia** (contata a parte, non è un'assenza) e altre ore.
+- Nell'appello: 8 ore, assente, **malattia**, **pioggia** (contate a parte, non sono assenze) e altre ore
+  (da 1 a 12, il 4 è la mezza giornata).
 - Il **sabato** non si segnano le ore ma la **trasferta** in euro di ognuno, già proposta uguale all'ultima volta.
 - Ogni dipendente ha il suo **cantiere del mese**; l'agenzia lo conferma a inizio mese (anche qualche giorno prima).
 - Il **documento del mese** è un **PDF** per il commercialista (griglia, riepilogo, tabella delle trasferte)
@@ -133,8 +134,10 @@ l'avviso: lo tocchi, segni chi manca, *Conferma*."
 - I soci compilano e correggono **tutti i giorni del mese in corso** e, **fino al 15**, anche quelli
   del mese prima; i giorni più vecchi (mesi già mandati all'agenzia) li puoi correggere solo tu.
   Con `PRIMO_GIORNO` nel `.env` (es. `2026-10-01`) l'app non chiede niente dei giorni precedenti.
-- **Pioggia**: nell'appello tocca il nome fino a *Pioggia*, oppure *Tutti: pioggia*. Il giorno conta come
-  compilato; nel documento ha la sua riga e il totale "Pioggia (gg)", separato da ore e assenze.
+- **Malattia e pioggia**: nell'appello tocca il nome (8 ore → assente → malattia → pioggia → altre ore),
+  oppure *Tutti: pioggia*. Il giorno conta come compilato; nel documento ognuna ha la sua riga e il suo
+  totale ("Malattia (gg)", "Pioggia (gg)"), separati da ore e assenze. Le **4 ore** si scelgono da *altre ore*
+  e restano la mezza giornata.
 - **Sabato = trasferte**: il sabato l'appello diventa *Trasferte*: per ognuno una cifra in euro (0 = non c'era),
   già scritta uguale all'ultima trasferta maggiore di zero. Nel documento i sabati **non** sono nella
   griglia dei giorni: c'è una tabella **TRASFERTE** con dipendente, cantiere, quanti sabati e la somma in euro.

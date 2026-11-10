@@ -12,9 +12,10 @@ export const CFG = {
   // Chi e' amministratore vede e modifica tutto.
   SQUADRE: ['MURATORI', 'CARPENTIERI'],
 
-  // riga = in quale riga del foglio mensile finisce (ord. / fer / fes / pioggia)
+  // riga = in quale riga del foglio mensile finisce (ord. / fer / fes / pioggia / malattia)
   CODICI: {
     ORD: { etichetta: '8 ore',          breve: '8 ore',   riga: 'ord.', ore: 8, emoji: '✅' },
+    // le 4 ore si scelgono da "altre ore" ma restano la mezza giornata (vedi Q.voce)
     MEZ: { etichetta: 'mezza giornata', breve: '4 ore',   riga: 'ord.', ore: 4, emoji: '🕓' },
     // le ore le sceglie chi fa l'appello (vedi ORE_A_SCELTA): ore qui non c'e'
     ALT: { etichetta: 'altre ore',      breve: 'altre ore', riga: 'ord.', ore: null, emoji: '⏱️' },
@@ -22,15 +23,17 @@ export const CFG = {
     FES: { etichetta: 'festivo',        breve: 'festivo', riga: 'fes',  ore: 8, emoji: '🎉' },
     // la pioggia non e' lavoro e non e' assenza: ha la sua riga e il suo totale
     PIO: { etichetta: 'pioggia',        breve: 'pioggia', riga: 'pioggia', ore: 8, emoji: '🌧️' },
+    // la malattia, come ferie e pioggia: giorno compilato, riga e totale suoi
+    MAL: { etichetta: 'malattia',       breve: 'malattia', riga: 'malattia', ore: 8, emoji: '🤒' },
     ASS: { etichetta: 'assente',        breve: 'assente', riga: null,   ore: 0, emoji: '⬜' }
   },
 
-  // Toccando un nome: 8 ore -> assente -> 4 ore -> pioggia -> altre ore (si sceglie quante) -> di nuovo 8 ore.
-  CICLO: ['ORD', 'ASS', 'MEZ', 'PIO', 'ALT'],
+  // Toccando un nome: 8 ore -> assente -> malattia -> pioggia -> altre ore (si sceglie quante) -> di nuovo 8 ore.
+  CICLO: ['ORD', 'ASS', 'MAL', 'PIO', 'ALT'],
 
-  // Le ore che si possono scegliere con "altre ore": da 1 a 12, tranne 4 e 8,
-  // che sono gia' la mezza giornata e la giornata intera.
-  ORE_A_SCELTA: [1, 2, 3, 5, 6, 7, 9, 10, 11, 12],
+  // Le ore che si possono scegliere con "altre ore": da 1 a 12, tranne 8 (la giornata intera).
+  // Il 4 c'e': nel database diventa la mezza giornata (MEZ).
+  ORE_A_SCELTA: [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12],
 
   ORA_APPELLO: 18,          // promemoria dell'appello (giorni lavorativi)
   ORA_RIEPILOGO: 20,        // riepilogo della settimana, la domenica

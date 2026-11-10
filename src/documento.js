@@ -3,7 +3,7 @@
  * ---------------------------------------------------------------------------
  * A4 orizzontale, tre parti:
  *   1. la griglia del mese: una riga per dipendente, raggruppati per cantiere,
- *      un quadretto per giorno (8, 4, ore, F ferie, FS festivo, P pioggia, — assente);
+ *      un quadretto per giorno (8, 4, ore, F ferie, FS festivo, P pioggia, MAL malattia, — assente);
  *      sabati e domeniche grigi e vuoti: il sabato si paga a trasferta;
  *   2. il RIEPILOGO con i totali di ognuno;
  *   3. le TRASFERTE: la somma dei sabati di ognuno.
@@ -18,7 +18,7 @@ import { nomeScheda } from './foglio.js';
 const MARGINE = 28;
 const ALTO = 14;                      // altezza di una riga
 const COLORE = { testo: '#1d2733', tenue: '#5b6675', bordo: '#c9ced6', grigio: '#e7e9ec', testa: '#dfeaf6', gruppo: '#f3f6fa' };
-const SIGLA = { ORD: '8', MEZ: '4', FER: 'F', FES: 'FS', PIO: 'P', ASS: '—' };
+const SIGLA = { ORD: '8', MEZ: '4', FER: 'F', FES: 'FS', PIO: 'P', MAL: 'MAL', ASS: '—' };
 
 const euro = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €';
 
@@ -52,7 +52,7 @@ export function documentoMese(db, anno, mese0, adesso = new Date()) {
   const L_NOME = 118, L_CANT = 96;
   const lGiorno = (largo - L_NOME - L_CANT) / T.giorni;
   const sottoGriglia = 'Griglia del mese · 8 = giornata · 4 = mezza giornata · numero = ore · F = ferie · FS = festivo · ' +
-    'P = pioggia · — = assente · sabati e domeniche in grigio (il sabato è nelle Trasferte)';
+    'P = pioggia · MAL = malattia · — = assente · sabati e domeniche in grigio (il sabato è nelle Trasferte)';
 
   function testaGriglia(y) {
     cella(MARGINE, y, L_NOME, 'Dipendente', { grassetto: true, sfondo: COLORE.testa });
@@ -121,15 +121,15 @@ export function documentoMese(db, anno, mese0, adesso = new Date()) {
   tabella('Riepilogo del mese',
     [{ t: 'Dipendente', k: 'nome', w: 120 }, { t: 'Squadra', k: 'squadra', w: 62 }, { t: 'Cantiere', k: 'cantiere', w: 110 },
      { t: 'Giorni', k: 'gg', w: 38, a: 'right' }, { t: 'Ore', k: 'ore', w: 38, a: 'right' }, { t: 'Mezze', k: 'mezze', w: 38, a: 'right' },
-     { t: 'Ferie', k: 'fer', w: 38, a: 'right' }, { t: 'Festivi', k: 'fes', w: 40, a: 'right' }, { t: 'Pioggia', k: 'pio', w: 42, a: 'right' },
+     { t: 'Ferie', k: 'fer', w: 38, a: 'right' }, { t: 'Festivi', k: 'fes', w: 40, a: 'right' }, { t: 'Pioggia', k: 'pio', w: 42, a: 'right' }, { t: 'Malattia', k: 'mal', w: 46, a: 'right' },
      { t: 'Extra', k: 'extra', w: 62, a: 'right' }, { t: 'Note sugli extra', k: 'note', w: 150 }],
     T.persone.map((p) => ({
       nome: p.nome, squadra: etichettaSquadra(p.squadra), cantiere: p.cantiere,
-      gg: n(p.riga.gg), ore: n(p.riga.ore), mezze: n(p.riga.mezze), fer: n(p.riga.fer), fes: n(p.riga.fes), pio: n(p.riga.pio),
+      gg: n(p.riga.gg), ore: n(p.riga.ore), mezze: n(p.riga.mezze), fer: n(p.riga.fer), fes: n(p.riga.fes), pio: n(p.riga.pio), mal: n(p.riga.mal),
       extra: p.riga.extra ? euro(p.riga.extra) : '', note: p.riga.note
     })),
     { nome: 'TOTALE', gg: n(T.totali.gg), ore: n(T.totali.ore), mezze: n(T.totali.mezze), fer: n(T.totali.fer),
-      fes: n(T.totali.fes), pio: n(T.totali.pio), extra: euro(T.totali.extra) });
+      fes: n(T.totali.fes), pio: n(T.totali.pio), mal: n(T.totali.mal), extra: euro(T.totali.extra) });
 
   // ---------------------------------------------------------------- 3. trasferte (i sabati)
   tabella('Trasferte del sabato · somma dei sabati del mese',

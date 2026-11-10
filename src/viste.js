@@ -125,7 +125,7 @@ export function statoGiorni(db, utente, dal, al, adesso = new Date()) {
 /** Il conto delle ore di un periodo, per gli uomini dell'utente. */
 export function riassuntoPeriodo(db, dal, al, titolo, utente, adesso = new Date()) {
   const elenco = dipendentiDelPeriodo(db, utente, dal, al);
-  const per = new Map(elenco.map((d) => [d.id, { nome: d.nome, squadra: d.squadra, gg: 0, ore: 0, mezze: 0, fer: 0, fes: 0, pio: 0, sabati: 0, trasferte: 0 }]));
+  const per = new Map(elenco.map((d) => [d.id, { nome: d.nome, squadra: d.squadra, gg: 0, ore: 0, mezze: 0, fer: 0, fes: 0, pio: 0, mal: 0, sabati: 0, trasferte: 0 }]));
 
   for (const r of Q.presenzeIntervallo(db, dal, al)) {
     const p = per.get(r.dipendenteId);
@@ -135,6 +135,7 @@ export function riassuntoPeriodo(db, dal, al, titolo, utente, adesso = new Date(
     if (r.codice === 'FER') p.fer += 1;
     if (r.codice === 'FES') p.fes += 1;
     if (r.codice === 'PIO') p.pio += 1;
+    if (r.codice === 'MAL') p.mal += 1;
   }
   // le trasferte del sabato: a parte, mai mescolate alle ore
   for (const t of Q.sabatiIntervallo(db, dal, al)) {

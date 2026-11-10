@@ -3,7 +3,7 @@
  * ---------------------------------------------------------------------------
  * Ricalca il vostro "Foglio presenze.xlsx" (scheda AGOSTO): un blocco per
  * dipendente — nome in grande, riga dei giorni, lettere, ord. / fer / fes /
- * pioggia — con il cantiere del mese nel riquadro azzurro (la squadra se manca).
+ * pioggia / malattia — con il cantiere del mese nel riquadro azzurro (la squadra se manca).
  * Sabati e domeniche restano vuoti e grigi: il sabato si paga a trasferta.
  * Poi la scheda RIEPILOGO con i totali e la scheda TRASFERTE con i sabati.
  * I conti li fa totali.js, gli stessi del PDF.
@@ -12,7 +12,7 @@ import ExcelJS from 'exceljs';
 import { CFG } from './config.js';
 import { totaliMese, etichettaSquadra } from './totali.js';
 
-const RIGHE_BLOCCO = 13;
+const RIGHE_BLOCCO = 15;
 const BLOCCHI_PER_PAGINA = 3;
 const ULTIMA_COL = 32;          // AF: 31 giorni dopo la colonna A
 const SOTTILE = { style: 'thin' };
@@ -63,7 +63,7 @@ export async function foglioMese(db, anno, mese0) {
       sq.border = { bottom: SOTTILE };
     }
 
-    const valori = { 'ord.': [], fer: [], fes: [], pioggia: [] };
+    const valori = { 'ord.': [], fer: [], fes: [], pioggia: [], malattia: [] };
     for (let g = 1; g <= giorni; g++) {
       const v = dip.voci[g];
       const def = v && CFG.CODICI[v.codice];
@@ -80,6 +80,8 @@ export async function foglioMese(db, anno, mese0) {
       ['fes', ...valori.fes],
       [],
       ['pioggia', ...valori.pioggia],
+      [],
+      ['malattia', ...valori.malattia],
       []
     ];
 
@@ -92,11 +94,11 @@ export async function foglioMese(db, anno, mese0) {
         cella.font = CARATTERE;
         if (c > 1) cella.alignment = { horizontal: 'center' };
         if (c > 1 && i > 0 && finesettimana[c - 2]) cella.fill = GRIGIO;
-        // la griglia del vostro foglio: righe chiuse sopra gg., ord., fer, fes, pioggia e in fondo
+        // la griglia del vostro foglio: righe chiuse sopra gg., ord., fer, fes, pioggia, malattia e in fondo
         cella.border = {
           left: SOTTILE, right: SOTTILE,
-          top: [0, 2, 4, 6, 8].includes(i) ? SOTTILE : undefined,
-          bottom: [1, 9].includes(i) ? SOTTILE : undefined
+          top: [0, 2, 4, 6, 8, 10].includes(i) ? SOTTILE : undefined,
+          bottom: [1, 11].includes(i) ? SOTTILE : undefined
         };
       }
     });
@@ -123,6 +125,7 @@ export async function foglioMese(db, anno, mese0) {
     { header: 'Ferie (gg)', key: 'fer', width: 10 },
     { header: 'Festivi (gg)', key: 'fes', width: 11 },
     { header: 'Pioggia (gg)', key: 'pio', width: 11 },
+    { header: 'Malattia (gg)', key: 'mal', width: 11 },
     { header: 'Compensi extra €', key: 'extra', width: 15 },
     { header: 'Note sugli extra', key: 'note', width: 40 }
   ];

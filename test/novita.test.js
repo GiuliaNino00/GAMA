@@ -144,7 +144,7 @@ test('cantieri nel report: riquadro azzurro, colonna nel RIEPILOGO e nelle TRASF
   esegui(db, giuliano, 'salvaSabato', { d: '20260905', importi: { 'PIPERIS P.': 40 } }, ctx);
   const wb = await leggi(await foglioMese(db, 2026, 8));
   assert.equal(wb.getWorksheet('SETTEMBRE 2026').getCell('I2').value, 'Via Roma - Bari');
-  assert.equal(wb.getWorksheet('SETTEMBRE 2026').getCell('I15').value, 'MURATORI', 'senza cantiere resta la squadra');
+  assert.equal(wb.getWorksheet('SETTEMBRE 2026').getCell('I17').value, 'MURATORI', 'senza cantiere resta la squadra');
   assert.equal(rigaDi(wb.getWorksheet('RIEPILOGO'), 'PIPERIS P.').getCell(3).value, 'Via Roma - Bari');
   assert.equal(rigaDi(wb.getWorksheet('TRASFERTE'), 'PIPERIS P.').getCell(2).value, 'Via Roma - Bari');
 });
@@ -206,4 +206,29 @@ test('PDF: stessi blocchi dell\'Excel, tre parti, numeri da totali.js', async ()
   const wb = await leggi(await foglioMese(db, 2026, 7));
   assert.equal(rigaDi(wb.getWorksheet('RIEPILOGO'), 'TOTALE').getCell(5).value, T.totali.ore);
   assert.ok(D.eSabato(new Date(2026, 7, 1)));
+});
+
+// ---------------------------------------------------------------- malattia e 4 ore dalla griglia
+
+test('malattia: nel ciclo al posto delle 4 ore, giorno compilato, riga e totale suoi', async () => {
+  const { db, matteo, giuliano } = banco();
+  const { CFG } = await import('../src/config.js');
+  assert.deepEqual(CFG.CICLO, ['ORD', 'ASS', 'MAL', 'PIO', 'ALT']);
+  assert.ok(CFG.ORE_A_SCELTA.includes(4) && !CFG.ORE_A_SCELTA.includes(8));
+  const r = esegui(db, matteo, 'salvaAppello', { d: '20260914', stati: { 'PIPERIS P.': 'MAL', 'PIPERIS G.': { codice: 'ALT', ore: 4 }, 'ZUCCARO D.': 'ORD' } }, ctx);
+  assert.deepEqual(r, { ok: true, messaggio: '2 al lavoro, 12 ore registrate.' });
+  const salvate = Q.presenzeDelGiorno(db, '2026-09-14');
+  assert.deepEqual([salvate['PIPERIS P.'].codice, salvate['PIPERIS G.'].codice], ['MAL', 'MEZ'], '4 ore dalla griglia = mezza giornata');
+  assert.equal(V.carica(db, matteo, 'giorni', null, ctx).dati.find((g) => g.codice === '20260914').fatto, true);
+  const s = V.carica(db, matteo, 'settimana', null, ctx).dati;
+  assert.deepEqual(s.righe.map((x) => [x.gg, x.ore, x.mal, x.mezze]), [[0, 0, 1, 0], [1, 4, 0, 1], [1, 8, 0, 0]]);
+
+  esegui(db, giuliano, 'salvaAppello', { d: '20260901', stati: { 'PIPERIS P.': 'MAL' } }, ctx);
+  const wb = await leggi(await foglioMese(db, 2026, 8));
+  const ws = wb.getWorksheet('SETTEMBRE 2026');
+  assert.deepEqual([ws.getCell('A13').value, ws.getCell('B13').value, ws.getCell('B5').value], ['malattia', 8, null]);
+  const rs = wb.getWorksheet('RIEPILOGO');
+  assert.equal(rs.getRow(1).getCell(10).value, 'Malattia (gg)');
+  assert.equal(rigaDi(rs, 'PIPERIS P.').getCell(10).value, 2);
+  assert.equal(totaliMese(db, 2026, 8).totali.mal, 2);
 });

@@ -36,7 +36,7 @@ export function totaliMese(db, anno, mese0) {
     sabati.set(t.dipendenteId, x);
   }
 
-  const totali = { gg: 0, ore: 0, mezze: 0, fer: 0, fes: 0, pio: 0, extra: 0 };
+  const totali = { gg: 0, ore: 0, mezze: 0, fer: 0, fes: 0, pio: 0, mal: 0, extra: 0 };
   const persone = elenco.map((dip) => {
     const voci = indice.get(dip.id) || {};
     const lista = Object.values(voci);
@@ -44,7 +44,7 @@ export function totaliMese(db, anno, mese0) {
     const riga = {
       gg: lista.filter((v) => v.codice === 'ORD' || v.codice === 'MEZ' || v.codice === 'ALT').length,
       ore: lista.reduce((s, v) => s + (CFG.CODICI[v.codice] && CFG.CODICI[v.codice].riga === 'ord.' ? v.ore : 0), 0),
-      mezze: conta('MEZ'), fer: conta('FER'), fes: conta('FES'), pio: conta('PIO'),
+      mezze: conta('MEZ'), fer: conta('FER'), fes: conta('FES'), pio: conta('PIO'), mal: conta('MAL'),
       extra: extra[dip.nome] ? extra[dip.nome].totale : 0,
       note: extra[dip.nome] ? extra[dip.nome].note.join('; ') : ''
     };

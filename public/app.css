@@ -168,6 +168,7 @@ button{cursor:pointer}
 .riga[data-s="FER"] .avatar,.riga[data-s="FER"] .pill{background:var(--blu-chiaro);color:var(--blu-testo)}
 .riga[data-s="PIO"] .avatar,.riga[data-s="PIO"] .pill{background:var(--blu-chiaro);color:var(--blu-testo)}
 .riga[data-s="PIO"] .pill{outline:1.5px solid currentColor;outline-offset:-1.5px}
+.riga[data-s="MAL"] .avatar,.riga[data-s="MAL"] .pill{background:var(--rosso-chiaro);color:var(--rosso)}
 .riga[data-s="FES"] .avatar,.riga[data-s="FES"] .pill{background:var(--blu-chiaro);color:var(--blu-testo)}
 .riga.colpo .avatar,.riga.colpo .pill{animation:colpo .22s ease-out}
 @keyframes colpo{0%{transform:scale(.86)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
@@ -180,7 +181,7 @@ button{cursor:pointer}
 .contatore{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 6px;border-radius:14px;font-size:14px;font-weight:700;
   background:var(--superficie);box-shadow:var(--ombra);font-variant-numeric:tabular-nums}
 .contatore b{font-size:18px}
-.contatore.verde{color:var(--verde)} .contatore.ambra{color:var(--ambra)} .contatore.grigio{color:var(--testo-3)} .contatore.blu{color:var(--blu-testo)}
+.contatore.verde{color:var(--verde)} .contatore.ambra{color:var(--ambra)} .contatore.grigio{color:var(--testo-3)} .contatore.blu{color:var(--blu-testo)} .contatore.rosso{color:var(--rosso)}
 .banda{display:flex;gap:10px;align-items:center;border-radius:var(--r-m);padding:11px 14px;margin:4px 0 10px;font-size:14px;
   background:var(--ambra-chiaro);color:var(--testo)}
 .banda .i{color:var(--ambra)}

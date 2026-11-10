@@ -51,6 +51,7 @@
     chiudi: '<path d="M18 6L6 18M6 6l12 12"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.5"/>',
     invia: '<path d="M4 12l16-8-6 16-2.5-6.5z"/>',
+    malattia: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
     pioggia: '<path d="M7 15a4 4 0 0 1 .4-8A5.5 5.5 0 0 1 18 8.6 3.3 3.3 0 0 1 17.5 15z"/><path d="M8.5 18.5l-1 2M12.5 18.5l-1 2M16.5 18.5l-1 2"/>',
     cantiere: '<path d="M3 21h18"/><path d="M5 21V9.5L12 4l7 5.5V21"/><path d="M9.5 21v-5.5h5V21"/>',
     camion: '<path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
@@ -420,7 +421,7 @@
     s.insertBefore(b, dopo ? dopo.nextSibling : s.firstChild);
   }
 
-  var PILLOLE = { ORD: ['spunta', '8 ore'], MEZ: ['orologio', '4 ore'], ASS: ['meno', 'Assente'], FER: ['calendario', 'Ferie'], FES: ['calendario', 'Festivo'], PIO: ['pioggia', 'Pioggia'] };
+  var PILLOLE = { ORD: ['spunta', '8 ore'], MEZ: ['orologio', '4 ore'], ASS: ['meno', 'Assente'], FER: ['calendario', 'Ferie'], FES: ['calendario', 'Festivo'], PIO: ['pioggia', 'Pioggia'], MAL: ['malattia', 'Malattia'] };
   function pillola(r) { return r.stato === 'ALT' ? ['orologio', r.ore + ' ore'] : PILLOLE[r.stato] || PILLOLE.ASS; }
 
   /**
@@ -465,7 +466,8 @@
 
     s.appendChild(el('div', 'contatori',
       '<span class="contatore verde">' + ico('spunta', 'i-s') + '<b id="cOrd">0</b> 8 ore</span>' +
-      '<span class="contatore ambra">' + ico('orologio', 'i-s') + '<b id="cMez">0</b> 4 ore</span>' +
+      '<span class="contatore ambra" id="cMezBox" hidden>' + ico('orologio', 'i-s') + '<b id="cMez">0</b> 4 ore</span>' +
+      '<span class="contatore rosso" id="cMalBox" hidden>' + ico('malattia', 'i-s') + '<b id="cMal">0</b> malattia</span>' +
       '<span class="contatore verde" id="cAltBox" hidden>' + ico('orologio', 'i-s') + '<b id="cAlt">0</b> altre</span>' +
       '<span class="contatore blu" id="cPioBox" hidden>' + ico('pioggia', 'i-s') + '<b id="cPio">0</b> pioggia</span>' +
       '<span class="contatore grigio">' + ico('meno', 'i-s') + '<b id="cAss">0</b> assenti</span>'));
@@ -475,7 +477,7 @@
         ? 'Già salvato da ' + testo(A.giaFatto) + (A.quando ? ' alle ' + testo(A.quando) : '') + '. Puoi correggere e confermare di nuovo.'
         : 'Compilato in parte da ' + testo(A.giaFatto) + ': le altre squadre mancano ancora.') + '</span>'));
     }
-    s.appendChild(el('p', 'aiuto', 'Sono tutti a <b>8 ore</b>. Tocca un nome per cambiarlo: <b>8 ore → assente → 4 ore → pioggia → altre ore</b>.'));
+    s.appendChild(el('p', 'aiuto', 'Sono tutti a <b>8 ore</b>. Tocca un nome per cambiarlo: <b>8 ore → assente → malattia → pioggia → altre ore</b> (4 ore e le altre si scelgono lì).'));
 
     var lista = el('div', 'lista');
     var squadre = {};
@@ -509,7 +511,7 @@
         var dopo = S.ciclo[(i + 1) % S.ciclo.length];
         if (dopo !== 'ALT') return cambia(dopo);
         // dopo le 4 ore si scelgono le ore; chi chiude senza scegliere torna a 8 ore
-        scegliOre(r.nome, r.ore).then(function (ore) { if (ore) cambia('ALT', ore); else cambia(S.ciclo[0]); });
+        scegliOre(r.nome, r.stato === 'MEZ' ? 4 : r.ore).then(function (ore) { if (ore) cambia('ALT', ore); else cambia(S.ciclo[0]); });
       });
       lista.appendChild(b);
     });
@@ -631,14 +633,15 @@
   }
 
   function conta() {
-    var c = { ORD: 0, MEZ: 0, ALT: 0, ASS: 0, PIO: 0 }, ore = 0;
+    var c = { ORD: 0, MEZ: 0, ALT: 0, ASS: 0, PIO: 0, MAL: 0 }, ore = 0;
     S.appello.righe.forEach(function (r) {
       var def = S.codici[r.stato];
       if (c[r.stato] !== undefined) c[r.stato]++;
       if (def && def.riga === 'ord.') ore += r.stato === 'ALT' ? r.ore : def.ore;
     });
     if ($('cOrd')) {
-      $('cOrd').textContent = c.ORD; $('cMez').textContent = c.MEZ; $('cAss').textContent = c.ASS;
+      $('cOrd').textContent = c.ORD; $('cMez').textContent = c.MEZ; $('cMezBox').hidden = !c.MEZ; $('cAss').textContent = c.ASS;
+      $('cMal').textContent = c.MAL; $('cMalBox').hidden = !c.MAL;
       $('cAlt').textContent = c.ALT; $('cAltBox').hidden = !c.ALT;
       $('cPio').textContent = c.PIO; $('cPioBox').hidden = !c.PIO;
     }
@@ -777,12 +780,13 @@
         '<span class="val">' + p.gg + ' gg <small>· ' + p.ore + ' h</small></span>' +
         '<span class="barra"><i style="width:' + pct(interi) + '"></i><i class="mezza" style="width:' + pct(p.mezze) + '"></i>' +
         '<i class="ferie" style="width:' + pct(p.fer) + '"></i></span>');
-      if (p.mezze || p.fer || p.fes || p.pio || p.trasferte) {
+      if (p.mezze || p.fer || p.fes || p.pio || p.mal || p.trasferte) {
         var ch = el('span', 'chips');
         if (p.mezze) ch.appendChild(el('span', null, p.mezze + (p.mezze === 1 ? ' mezza giornata' : ' mezze giornate')));
         if (p.fer) ch.appendChild(el('span', 'fer', p.fer + ' ferie'));
         if (p.fes) ch.appendChild(el('span', 'fer', p.fes + ' festivi'));
         if (p.pio) ch.appendChild(el('span', 'fer', p.pio + (p.pio === 1 ? ' giorno di pioggia' : ' giorni di pioggia')));
+        if (p.mal) ch.appendChild(el('span', 'fer', p.mal + (p.mal === 1 ? ' giorno di malattia' : ' giorni di malattia')));
         if (p.trasferte) ch.appendChild(el('span', null, euro(p.trasferte) + ' di trasferte (' + p.sabati + (p.sabati === 1 ? ' sabato)' : ' sabati)')));
         r.appendChild(ch);
       }
