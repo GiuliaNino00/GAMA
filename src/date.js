@@ -85,6 +85,20 @@ export function giornoDiLavoro(d) {
   return true;
 }
 
+/** Il sabato non si fa l'appello a ore: si segnano le trasferte in euro. */
+export function eSabato(d) {
+  return d.getDay() === 6;
+}
+
+/** "2026-10" -> { anno, mese0 }; e da Date a "2026-10". */
+export function daMeseChiave(m) {
+  const [a, mm] = String(m).split('-').map(Number);
+  return { anno: a, mese0: mm - 1 };
+}
+export function meseDi(d) {
+  return meseChiave(d.getFullYear(), d.getMonth());
+}
+
 /** Lo stato di partenza dell'appello: domenica tutti assenti, gli altri giorni 8 ore. */
 export function statoPredefinito(d) {
   return d.getDay() === 0 ? 'ASS' : 'ORD';

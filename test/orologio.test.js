@@ -1,7 +1,7 @@
 // I promemoria automatici: quando partono, a chi, e mai due volte.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { banco, notificheFinte, compilaMese } from './aiuto.js';
+import { banco, notificheFinte, compilaMese, confermaMese } from './aiuto.js';
 import { lavoriDovuti, creaOrologio } from '../src/orologio.js';
 import { esegui } from '../src/azioni.js';
 import * as Q from '../src/dati.js';
@@ -31,6 +31,11 @@ test('alle 18 il promemoria va solo a chi non ha ancora fatto l\'appello', async
   // giornate precedenti tutte compilate, cosi' contano solo quelle di oggi
   for (let g = 1; g <= 15; g++) {
     const d = '202609' + String(g).padStart(2, '0');
+    if (new Date(2026, 8, g).getDay() === 6) {
+      esegui(db, matteo, 'salvaSabato', { d, importi: { 'PIPERIS P.': 0 } }, { adesso: ora(16, 19) });
+      esegui(db, antonio, 'salvaSabato', { d, importi: { "D'AMORE E.": 50 } }, { adesso: ora(16, 19) });
+      continue;
+    }
     esegui(db, matteo, 'salvaAppello', { d, stati: { 'PIPERIS P.': 'ORD' } }, { adesso: ora(16, 19) });
     esegui(db, antonio, 'salvaAppello', { d, stati: { "D'AMORE E.": 'ORD' } }, { adesso: ora(16, 19) });
   }
@@ -65,18 +70,20 @@ test('la domenica il riepilogo, il primo del mese il foglio pronto per l\'ammini
   assert.ok(n1.inviate.every((n) => n.percorso === 'settimana'));
 
   compilaMese(db, 2026, 8);
+  confermaMese(db, 2026, 8);
   const n2 = notificheFinte();
   await creaOrologio(db, { notifiche: n2, adesso: () => new Date(2026, 9, 1, 8, 5) }).giro();
   const admin = n2.inviate.filter((n) => n.a === 'Giuliano');
   assert.equal(admin.length, 1, 'niente secondo avviso "foglio pronto"');
   assert.equal(admin[0].percorso, 'mese/202609');
-  assert.match(admin[0].testo, /pronto da scaricare/);
+  assert.match(admin[0].testo, /documento del mese è pronto.*Studio Corvasce/);
   assert.match(n2.inviate.find((n) => n.a === 'Matteo').testo, /riepilogo/);
 });
 
 test('il primo del mese, se mancano giorni: elenco a chi li deve fare, e foglio pronto solo quando e\' tutto compilato', async () => {
   const { db, matteo } = banco();
   compilaMese(db, 2026, 8, [29, 30]);
+  confermaMese(db, 2026, 8);
   Q.salvaPresenze(db, '2026-09-30', { 'PIPERIS P.': 'ORD' }, 'prova');      // i muratori il 30 l'hanno fatto
   const n = notificheFinte();
   let quando = new Date(2026, 9, 1, 8, 5);
@@ -101,7 +108,7 @@ test('il primo del mese, se mancano giorni: elenco a chi li deve fare, e foglio 
   const pronto = n.inviate.filter((x) => x.titolo === '📄 Foglio di settembre pronto');
   assert.equal(pronto.length, 1);
   assert.equal(pronto[0].a, 'Giuliano');
-  assert.match(pronto[0].testo, /Gama srl/);
+  assert.match(pronto[0].testo, /Studio Corvasce/);
   await orologio.giro();
   assert.equal(n.inviate.filter((x) => x.titolo === '📄 Foglio di settembre pronto').length, 1, 'non si ripete');
 });
@@ -129,8 +136,9 @@ test('l\'Agenzia non riceve i promemoria dell\'appello, ma riceve "foglio pronto
   await creaOrologio(db, { notifiche: n, adesso: () => new Date(2026, 9, 1, 8, 5) }).giro();
   assert.ok(!n.inviate.some((x) => x.a === 'Studio Paghe'));
   compilaMese(db, 2026, 8);
+  confermaMese(db, 2026, 8);
   await creaOrologio(db, { notifiche: n, adesso: () => new Date(2026, 9, 2, 9, 0) }).giro();
-  const sua = n.inviate.filter((x) => x.a === 'Studio Paghe');
+  const sua = n.inviate.filter((x) => x.a === 'Studio Paghe' && x.titolo.includes('pronto'));
   assert.equal(sua.length, 1);
   assert.equal(sua[0].titolo, '📄 Foglio di settembre pronto');
   assert.doesNotMatch(sua[0].testo, /mandarlo/);

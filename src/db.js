@@ -73,7 +73,36 @@ const MIGRAZIONI = [
   );
   `,
   // 2 — il ruolo Agenzia: vede e corregge tutto, gestisce i dipendenti, non gli utenti
-  `ALTER TABLE utenti ADD COLUMN agenzia INTEGER NOT NULL DEFAULT 0;`
+  `ALTER TABLE utenti ADD COLUMN agenzia INTEGER NOT NULL DEFAULT 0;`,
+  // 3 — cantieri (elenco, uno per dipendente per mese, conferma del mese) e trasferte del sabato
+  `
+  CREATE TABLE cantieri (
+    id     INTEGER PRIMARY KEY,
+    nome   TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    attivo INTEGER NOT NULL DEFAULT 1
+  );
+  CREATE TABLE cantieri_mese (
+    mese          TEXT NOT NULL,
+    dipendente_id INTEGER NOT NULL REFERENCES dipendenti(id),
+    cantiere_id   INTEGER NOT NULL REFERENCES cantieri(id),
+    inserito_da   TEXT NOT NULL DEFAULT '',
+    aggiornato    TEXT NOT NULL,
+    PRIMARY KEY (mese, dipendente_id)
+  ) WITHOUT ROWID;
+  CREATE TABLE conferme_cantieri (
+    mese          TEXT PRIMARY KEY,
+    confermato_da TEXT NOT NULL,
+    quando        TEXT NOT NULL
+  );
+  CREATE TABLE sabati (
+    data          TEXT NOT NULL,
+    dipendente_id INTEGER NOT NULL REFERENCES dipendenti(id),
+    importo       REAL NOT NULL,
+    inserito_da   TEXT NOT NULL DEFAULT '',
+    aggiornato    TEXT NOT NULL,
+    PRIMARY KEY (data, dipendente_id)
+  ) WITHOUT ROWID;
+  `
 ];
 
 /** Apre (o crea) il database e lo porta all'ultima versione della struttura. */

@@ -145,7 +145,7 @@ button{cursor:pointer}
 .invito .i{color:var(--blu-testo)}
 
 /* ---------------------------------------------------------------- elenchi di persone */
-.lista{display:grid;gap:8px;margin:10px 0}
+.lista{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:10px 0}
 .gruppo{font-size:12.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--testo-3);margin:14px 6px 2px}
 .gruppo:first-child{margin-top:4px}
 .riga{display:flex;align-items:center;gap:13px;width:100%;min-height:64px;padding:10px 14px 10px 10px;border:0;border-radius:var(--r-m);
@@ -166,6 +166,8 @@ button{cursor:pointer}
 .riga[data-s="ALT"] .avatar,.riga[data-s="ALT"] .pill{background:var(--verde-chiaro);color:var(--verde)}
 .riga[data-s="ALT"] .pill{outline:1.5px dashed currentColor;outline-offset:-1.5px}
 .riga[data-s="FER"] .avatar,.riga[data-s="FER"] .pill{background:var(--blu-chiaro);color:var(--blu-testo)}
+.riga[data-s="PIO"] .avatar,.riga[data-s="PIO"] .pill{background:var(--blu-chiaro);color:var(--blu-testo)}
+.riga[data-s="PIO"] .pill{outline:1.5px solid currentColor;outline-offset:-1.5px}
 .riga[data-s="FES"] .avatar,.riga[data-s="FES"] .pill{background:var(--blu-chiaro);color:var(--blu-testo)}
 .riga.colpo .avatar,.riga.colpo .pill{animation:colpo .22s ease-out}
 @keyframes colpo{0%{transform:scale(.86)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
@@ -178,7 +180,7 @@ button{cursor:pointer}
 .contatore{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 6px;border-radius:14px;font-size:14px;font-weight:700;
   background:var(--superficie);box-shadow:var(--ombra);font-variant-numeric:tabular-nums}
 .contatore b{font-size:18px}
-.contatore.verde{color:var(--verde)} .contatore.ambra{color:var(--ambra)} .contatore.grigio{color:var(--testo-3)}
+.contatore.verde{color:var(--verde)} .contatore.ambra{color:var(--ambra)} .contatore.grigio{color:var(--testo-3)} .contatore.blu{color:var(--blu-testo)}
 .banda{display:flex;gap:10px;align-items:center;border-radius:var(--r-m);padding:11px 14px;margin:4px 0 10px;font-size:14px;
   background:var(--ambra-chiaro);color:var(--testo)}
 .banda .i{color:var(--ambra)}
@@ -378,3 +380,19 @@ body.semplice .segno{display:grid;place-items:center;width:84px;height:84px;marg
 body.semplice .segno svg{width:40px;height:40px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 body.semplice h1{font-size:22px;margin:0 0 10px;letter-spacing:-.02em}
 body.semplice p{color:var(--testo-2);margin:0}
+
+/* il sabato: la trasferta in euro di ognuno */
+.riga.trasferta{cursor:text}
+.riga.trasferta .nome{white-space:normal;overflow-wrap:anywhere;line-height:1.25}
+.euro-campo{flex:none;display:flex;align-items:center;gap:3px;background:var(--incavo);border-radius:var(--r-s);padding:0 9px;min-height:46px}
+.euro-campo span{font-weight:800;color:var(--testo-3)}
+.euro-campo input{width:58px;border:0;background:transparent;color:var(--testo);font-size:19px;font-weight:800;text-align:right;
+  font-variant-numeric:tabular-nums;padding:8px 0}
+.euro-campo input:focus{outline:none}
+.euro-campo:focus-within{outline:2px solid var(--blu-2)}
+
+/* il pannello dei cantieri */
+.lista-cantieri{display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto}
+.lista-cantieri button{display:flex;align-items:center;gap:10px;min-height:52px;border:0;border-radius:var(--r-s);background:var(--incavo);
+  color:var(--testo);font-size:16px;font-weight:600;text-align:left;padding:10px 14px}
+.lista-cantieri button.scelta{background:var(--verde);color:#fff}

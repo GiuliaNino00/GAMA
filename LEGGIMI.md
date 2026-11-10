@@ -16,8 +16,12 @@ niente Telegram obbligatorio, niente Meta, **nessun costo**.
 - **Leggera e veloce**: la prima apertura scarica circa 23 KB; poi stile e codice restano sul telefono.
 - Se due persone toccano la stessa giornata, chi conferma per secondo **vede prima la versione nuova**:
   nessuno sovrascrive il lavoro dell'altro senza accorgersene.
-- Il **foglio del mese** si scarica in Excel con l'impaginazione del vostro `Foglio presenze.xlsx`
-  (un blocco per dipendente, squadra nel riquadro azzurro) più una scheda RIEPILOGO con totali ed extra.
+- Nell'appello: 8 ore, assente, 4 ore, **pioggia** (contata a parte, non è un'assenza) e altre ore.
+- Il **sabato** non si segnano le ore ma la **trasferta** in euro di ognuno, già proposta uguale all'ultima volta.
+- Ogni dipendente ha il suo **cantiere del mese**; l'agenzia lo conferma a inizio mese (anche qualche giorno prima).
+- Il **documento del mese** è un **PDF** per il commercialista (griglia, riepilogo, tabella delle trasferte)
+  con la **bozza di mail già pronta in Gmail**, più l'**Excel** con l'impaginazione del vostro
+  `Foglio presenze.xlsx` (un blocco per dipendente, cantiere nel riquadro azzurro) per le modifiche.
 
 ---
 
@@ -129,19 +133,34 @@ l'avviso: lo tocchi, segni chi manca, *Conferma*."
 - I soci compilano e correggono **tutti i giorni del mese in corso** e, **fino al 15**, anche quelli
   del mese prima; i giorni più vecchi (mesi già mandati all'agenzia) li puoi correggere solo tu.
   Con `PRIMO_GIORNO` nel `.env` (es. `2026-10-01`) l'app non chiede niente dei giorni precedenti.
-- **📄 Riepilogo del mese → Foglio per l'agenzia**: il file .xlsx da mandare all'agenzia.
-  Si scarica **solo quando il mese è completo** (ogni squadra ha segnato ogni giorno di lavoro);
-  finché manca qualcosa l'app dice quali giorni. Il 1° del mese, se mancano giorni, arriva l'elenco
-  a te e ai soci interessati; appena il mese è completo ti arriva "foglio pronto". Se correggi
-  ancora qualcosa, il foglio si rifà con i dati nuovi a ogni download.
+- **Pioggia**: nell'appello tocca il nome fino a *Pioggia*, oppure *Tutti: pioggia*. Il giorno conta come
+  compilato; nel documento ha la sua riga e il totale "Pioggia (gg)", separato da ore e assenze.
+- **Sabato = trasferte**: il sabato l'appello diventa *Trasferte*: per ognuno una cifra in euro (0 = non c'era),
+  già scritta uguale all'ultima trasferta maggiore di zero. Nel documento i sabati **non** sono nella
+  griglia dei giorni: c'è una tabella **TRASFERTE** con dipendente, cantiere, quanti sabati e la somma in euro.
+  Le presenze vecchie importate dal Foglio Google che cadono di sabato restano com'erano.
+- **🏗️ Cantieri** (amministratore e agenzia): l'elenco dei cantieri e, per ogni mese, il cantiere di ognuno.
+  Il cantiere resta quello del mese prima finché non lo cambi; si può preparare il mese prossimo.
+  Ogni mese va **confermato** (*Conferma i cantieri di …*): dagli ultimi 3 giorni del mese prima, ogni mattina
+  alle 9, amministratore e agenzia ricevono l'avviso finché non è confermato. I caposquadra il cantiere
+  lo vedono in *Dipendenti*, ma non lo cambiano.
+- **📄 Mese → documento del mese**: PDF (griglia del mese per cantiere, RIEPILOGO, TRASFERTE) ed Excel
+  (stesse cose, da ritoccare). Lo scaricano **solo amministratore e agenzia**, e **solo quando il mese
+  è completo** (ogni squadra ha segnato ogni giorno di lavoro, sabati compresi) **e i cantieri del mese
+  sono confermati**; finché manca qualcosa l'app dice cosa. Il 1° del mese, se mancano giorni, arriva
+  l'elenco a te e ai soci interessati; appena tutto è pronto ti arriva "foglio pronto". Se correggi
+  ancora qualcosa, PDF ed Excel si rifanno con i dati nuovi a ogni download.
   Compare anche chi è uscito a metà mese, con i giorni che ha lavorato.
-- **Invia a Gama srl** (sotto il foglio): sul telefono apre *Condividi* con il foglio già allegato;
-  scegli *Mail* e incolla l'indirizzo (è già copiato). Sul computer scarica il foglio e apre una
-  mail già indirizzata. Nome e indirizzo stanno in `src/config.js` (`AGENZIA`).
+- **Prepara mail per Studio Corvasce** (sotto il PDF): nessuna mail parte da sola. Sul computer scarica il
+  PDF e apre **Gmail** (quello in cui sei entrato) con la bozza già indirizzata a
+  studiocorvasceconsulenza@gmail.com, con oggetto e testo: trascina dentro il PDF e invia. Sul telefono
+  apre *Condividi* con il PDF già allegato: scegli Gmail e incolla l'indirizzo (è già copiato).
+  Nome e indirizzo stanno in `src/config.js` (`COMMERCIALISTA`).
 - **Agenzia** (ruolo per chi segue paghe e documenti): vede e corregge presenze ed extra di tutte
-  le squadre e di qualunque giorno, gestisce i dipendenti e scarica il foglio del mese completo.
-  **Non** vede utenti e link e non può crearne: non può togliere l'accesso a nessuno.
-  Non riceve i promemoria dell'appello, solo "foglio pronto". Si crea da *Chi usa l'app* →
+  le squadre e di qualunque giorno, gestisce dipendenti e **cantieri** (e li conferma), scarica il documento
+  del mese e prepara la mail per il commercialista. **Non** vede utenti e link e non può crearne: non può
+  togliere l'accesso a nessuno. Non riceve i promemoria dell'appello, solo i cantieri da confermare
+  e "foglio pronto". Si crea da *Chi usa l'app* →
   *Aggiungi* → *Agenzia*, oppure con `nuovo-agenzia "Nome"`.
 - Il link è la chiave: chi ce l'ha entra a nome di quella persona.
 
@@ -149,8 +168,8 @@ Comandi utili sul server (`npm run cli -- …`, con Docker `docker compose exec 
 
 ```
 nuovo-admin "Nome"          nuovo-socio "Nome" MURATORI      nuovo-agenzia "Nome"
-nuovo-link "Nome"           foglio 202610 (solo se completo) prova-notifica "Nome"
-link                        backup
+nuovo-link "Nome"           foglio 202610 [--pdf]  (Excel, o PDF; solo se completo e confermato)
+link                        prova-notifica "Nome"            backup
 ```
 
 ## 7. Copie di sicurezza
@@ -192,9 +211,11 @@ src/
   dati.js       tutto il database e la regola "chi vede chi"
   viste.js      i dati di ogni schermata, già filtrati per chi guarda
   azioni.js     tutto quello che scrive, con i controlli
+  totali.js     i conti del mese, gli stessi per Excel e PDF
   foglio.js     il file Excel del mese
+  documento.js  il PDF del mese per il commercialista
   notifiche.js  notifiche web (gratuite) + Telegram facoltativo
-  orologio.js   promemoria delle 18, riepilogo della domenica, mese chiuso, backup
+  orologio.js   promemoria delle 18, riepilogo della domenica, mese chiuso, cantieri da confermare, backup
   importa.js    importazione dal Foglio Google
   cli.js        comandi da terminale
 public/         l'app sul telefono (pagina, stile, service worker, icone)
@@ -203,3 +224,4 @@ test/           le prove automatiche:  npm test
 
 Database: SQLite, un solo file (`dati/presenze.sqlite`). Le presenze hanno come chiave
 *(giorno, dipendente)*: correggere una giornata la sovrascrive, i doppioni non possono esistere.
+Lo stesso vale per le trasferte del sabato (tabella `sabati`) e per i cantieri del mese (`cantieri_mese`).

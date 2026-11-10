@@ -8,12 +8,17 @@ import { CFG } from './config.js';
 import * as D from './date.js';
 import * as Q from './dati.js';
 import { nomePulito, nomeUtente } from './nomi.js';
-import { datiAppello } from './viste.js';
+import { datiAppello, datiCantieri } from './viste.js';
 
 export function esegui(db, utente, azione, carico, { urlPubblico = '', adesso = new Date() } = {}) {
   const c = carico && typeof carico === 'object' ? carico : {};
   switch (azione) {
     case 'salvaAppello':    return salvaAppello(db, utente, c, adesso);
+    case 'salvaSabato':     return salvaSabato(db, utente, c, adesso);
+    case 'nuovoCantiere':   return nuovoCantiere(db, utente, c);
+    case 'attivaCantiere':  return attivaCantiere(db, utente, c);
+    case 'assegnaCantiere': return assegnaCantiere(db, utente, c, adesso);
+    case 'confermaCantieri': return confermaCantieri(db, utente, c, adesso);
     case 'salvaExtra':      return salvaExtra(db, utente, c, adesso);
     case 'nuovoDipendente': return nuovoDipendente(db, utente, c);
     case 'cambiaAttivo':    return cambiaAttivo(db, utente, c);
@@ -45,6 +50,7 @@ function salvaAppello(db, utente, c, adesso) {
   if (data > D.oggi(adesso)) return { ok: false, errore: 'Quel giorno deve ancora venire.' };
   const vecchio = troppoVecchioPer(db, utente, data, adesso);
   if (vecchio) return { ok: false, errore: vecchio };
+  if (D.eSabato(data)) return { ok: false, errore: 'Il sabato non si segnano le ore ma le trasferte: riapri la giornata.' };
 
   // Se la pagina dice su quale versione della giornata ha lavorato e nel frattempo
   // qualcuno ha salvato, non si sovrascrive: si rimanda indietro la versione nuova.
@@ -76,6 +82,92 @@ function salvaAppello(db, utente, c, adesso) {
     if (CFG.CODICI[v.codice].riga === 'ord.') { ore += v.ore; presenti++; }
   }
   return { ok: true, messaggio: presenti + ' al lavoro, ' + ore + ' ore registrate.' };
+}
+
+/** Le trasferte di un sabato: { d, importi: { "ROSSI M.": 50 }, impronta }. Stessi controlli dell'appello. */
+function salvaSabato(db, utente, c, adesso) {
+  if (!D.codiceValido(c.d)) return { ok: false, errore: 'Data non valida.' };
+  const data = D.daCodice(c.d);
+  if (!D.eSabato(data)) return { ok: false, errore: 'Le trasferte si segnano solo il sabato.' };
+  if (data > D.oggi(adesso)) return { ok: false, errore: 'Quel giorno deve ancora venire.' };
+  const vecchio = troppoVecchioPer(db, utente, data, adesso);
+  if (vecchio) return { ok: false, errore: vecchio };
+
+  const miei = Q.dipendentiDi(db, utente);
+  if (typeof c.impronta === 'string') {
+    const ora = Q.improntaSabato(db, D.chiave(data), miei.map((d) => d.id)).impronta;
+    if (ora !== c.impronta) {
+      const fresco = datiAppello(db, data, utente);
+      return {
+        ok: false, conflitto: true, dati: fresco,
+        errore: 'Nel frattempo ' + (fresco.giaFatto || 'qualcuno') + ' ha salvato questo sabato: ecco la versione aggiornata. Controlla e conferma di nuovo.'
+      };
+    }
+  }
+
+  const validi = new Set(miei.map((d) => d.nome));
+  const importi = {};
+  for (const [nome, v] of Object.entries(c.importi || {})) {
+    if (!validi.has(nome)) continue;
+    const euro = Q.euroValido(v);
+    if (euro === null) return { ok: false, errore: 'La cifra di ' + nome + ' non è valida (da 0 a ' + CFG.TRASFERTA_MAX + ' €).' };
+    importi[nome] = euro;
+  }
+  if (!Object.keys(importi).length) return { ok: false, errore: 'Non è arrivato nessun nome della tua squadra.' };
+
+  Q.salvaSabato(db, D.chiave(data), importi, utente.nome);
+  const inTrasferta = Object.values(importi).filter((v) => v > 0);
+  const totale = Math.round(inTrasferta.reduce((s, v) => s + v, 0) * 100) / 100;
+  return { ok: true, messaggio: inTrasferta.length ? inTrasferta.length + ' in trasferta, ' + totale.toFixed(2).replace('.', ',') + ' €.' : 'Nessuno in trasferta.' };
+}
+
+// ---------------------------------------------------------------- cantieri (amministratore e agenzia)
+
+function soloTutto(utente) {
+  return Q.vedeTutto(utente) ? null : { ok: false, errore: 'I cantieri li gestiscono l\'amministratore e l\'agenzia.' };
+}
+
+/** Si lavora sui cantieri fino al mese prossimo (per prepararlo in anticipo). */
+function meseValido(m, adesso) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(m || ''))) return false;
+  const o = D.oggi(adesso);
+  return String(m) <= D.meseDi(new Date(o.getFullYear(), o.getMonth() + 1, 1));
+}
+
+function nuovoCantiere(db, utente, c) {
+  const no = soloTutto(utente); if (no) return no;
+  const r = Q.aggiungiCantiere(db, c.nome);
+  return r.ok ? { ok: true, messaggio: r.nome + ' aggiunto.', id: r.id, nome: r.nome } : r;
+}
+
+function attivaCantiere(db, utente, c) {
+  const no = soloTutto(utente); if (no) return no;
+  if (!Q.cambiaAttivoCantiere(db, Number(c.id), c.attivo === true)) return { ok: false, errore: 'Cantiere non trovato.' };
+  return { ok: true, messaggio: c.attivo === true ? 'Cantiere riattivato.' : 'Cantiere disattivato: non si può più scegliere.' };
+}
+
+function assegnaCantiere(db, utente, c, adesso) {
+  const no = soloTutto(utente); if (no) return no;
+  if (!meseValido(c.mese, adesso)) return { ok: false, errore: 'Mese non valido.' };
+  const dip = Q.dipendentePerNome(db, c.nome);
+  if (!dip) return { ok: false, errore: 'Dipendente non trovato.' };
+  let id = null;
+  if (c.cantiere !== null && c.cantiere !== undefined && c.cantiere !== '') {
+    const can = Q.cantieri(db).find((x) => x.id === Number(c.cantiere));
+    if (!can || !can.attivo) return { ok: false, errore: 'Cantiere non trovato o non attivo.' };
+    id = can.id;
+  }
+  Q.assegnaCantiere(db, dip.id, String(c.mese), id, utente.nome);
+  const ora = Q.cantieriDelMese(db, String(c.mese)).get(dip.id);
+  return { ok: true, messaggio: dip.nome + ' → ' + (ora ? ora.nome : 'nessun cantiere'), dati: datiCantieri(db, utente, String(c.mese), adesso) };
+}
+
+function confermaCantieri(db, utente, c, adesso) {
+  const no = soloTutto(utente); if (no) return no;
+  if (!meseValido(c.mese, adesso)) return { ok: false, errore: 'Mese non valido.' };
+  Q.confermaCantieri(db, String(c.mese), utente.nome);
+  const { mese0 } = D.daMeseChiave(c.mese);
+  return { ok: true, messaggio: 'Cantieri di ' + CFG.MESI[mese0].toLowerCase() + ' confermati.', dati: datiCantieri(db, utente, String(c.mese), adesso) };
 }
 
 // ---------------------------------------------------------------- compensi extra

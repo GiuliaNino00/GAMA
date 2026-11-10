@@ -14,12 +14,13 @@ import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { env } from './config.js';
+import { CFG, env } from './config.js';
 import { apri, percorsoDb } from './db.js';
 import * as Q from './dati.js';
 import * as V from './viste.js';
 import { esegui } from './azioni.js';
 import { foglioMese, nomeScheda } from './foglio.js';
+import { documentoMese } from './documento.js';
 import { creaNotifiche } from './notifiche.js';
 import { creaOrologio } from './orologio.js';
 import { paginaApp, paginaBenvenuto, paginaLinkNonValido, manifest } from './pagina.js';
@@ -200,20 +201,21 @@ export function creaApp({ db, notifiche, urlPubblico, adesso = () => new Date() 
     } catch (e) { next(e); }
   });
 
+  // il documento del mese: .xlsx (per le modifiche) e .pdf (per il commercialista);
+  // solo amministratore e agenzia, solo a mese completo e cantieri confermati
   u.get('/foglio/:file', async (req, res, next) => {
     try {
-      if (!Q.vedeTutto(req.utente)) return res.status(403).type('text').send('Solo l\'amministratore e l\'agenzia scaricano il foglio del mese.');
-      const m = String(req.params.file).match(/^(\d{4})(0[1-9]|1[0-2])\.xlsx$/);
+      if (!Q.vedeTutto(req.utente)) return res.status(403).type('text').send('Solo l\'amministratore e l\'agenzia scaricano il documento del mese.');
+      const m = String(req.params.file).match(/^(\d{4})(0[1-9]|1[0-2])\.(xlsx|pdf)$/);
       if (!m) return res.status(400).type('text').send('Mese non valido.');
-      const anno = Number(m[1]), mese0 = Number(m[2]) - 1;
-      const manca = Q.mancantiPerIlFoglio(db, anno, mese0);
-      if (manca.length) {
-        return res.status(409).type('text').send('Il foglio si prepara solo a mese completo: mancano ancora i giorni ' + manca.join(', ') + '.');
-      }
-      const contenuto = await foglioMese(db, anno, mese0);
-      Q.registra(db, 'FOGLIO', nomeScheda(anno, mese0) + ' scaricato da ' + req.utente.nome);
-      res.set('Content-Disposition', 'attachment; filename="Presenze ' + nomeScheda(anno, mese0) + '.xlsx"');
-      res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').send(contenuto);
+      const anno = Number(m[1]), mese0 = Number(m[2]) - 1, pdf = m[3] === 'pdf';
+      const pronto = Q.prontoPerIlFoglio(db, anno, mese0);
+      if (!pronto.ok) return res.status(409).type('text').send(Q.motivoFoglio(pronto, CFG.MESI[mese0].toLowerCase()));
+      const contenuto = pdf ? await documentoMese(db, anno, mese0, adesso()) : await foglioMese(db, anno, mese0);
+      Q.registra(db, 'FOGLIO', nomeScheda(anno, mese0) + (pdf ? ' (PDF)' : ' (Excel)') + ' scaricato da ' + req.utente.nome);
+      res.set('Content-Disposition', 'attachment; filename="Presenze ' + nomeScheda(anno, mese0) + '.' + m[3] + '"');
+      res.set('Cache-Control', 'no-store');
+      res.type(pdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').send(contenuto);
     } catch (e) { next(e); }
   });
 

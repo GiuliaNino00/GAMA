@@ -51,6 +51,9 @@
     chiudi: '<path d="M18 6L6 18M6 6l12 12"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.5"/>',
     invia: '<path d="M4 12l16-8-6 16-2.5-6.5z"/>',
+    pioggia: '<path d="M7 15a4 4 0 0 1 .4-8A5.5 5.5 0 0 1 18 8.6 3.3 3.3 0 0 1 17.5 15z"/><path d="M8.5 18.5l-1 2M12.5 18.5l-1 2M16.5 18.5l-1 2"/>',
+    cantiere: '<path d="M3 21h18"/><path d="M5 21V9.5L12 4l7 5.5V21"/><path d="M9.5 21v-5.5h5V21"/>',
+    camion: '<path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
     condividi: '<path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 12H5.5A1.5 1.5 0 0 0 4 13.5v6A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5v-6a1.5 1.5 0 0 0-1.5-1.5H18"/>'
   };
   function ico(n, cls) { return '<svg class="i' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" aria-hidden="true">' + ICONE[n] + '</svg>'; }
@@ -255,6 +258,13 @@
       s.appendChild(n);
     }
 
+    (H.cantieri || []).slice(0, 1).forEach(function (m) {
+      var n = nota('giallo', 'avviso', '<b>Cantieri di ' + testo(m.nome) + ' da confermare.</b> ' +
+        (m.iniziato ? 'Il mese è iniziato: controlla dove lavora ognuno e conferma.' : 'Prepara il mese: controlla dove lavora ognuno e conferma.'));
+      n.querySelector('.corpo').appendChild(bottone('mini', ico('cantiere') + 'Apri i cantieri', function () { vai('cantieri', m.mese); }));
+      s.appendChild(n);
+    });
+
     if (S.avviso) {
       s.appendChild(nota('giallo', 'avviso', testo(S.avviso)));
     } else {
@@ -269,6 +279,7 @@
       ['euro', 'ambra', 'Compenso extra', 'una cifra in più a qualcuno', function () { vai('extra'); }],
       ['persone', '', 'Dipendenti', 'chi entra, chi esce', function () { vai('dipendenti'); }]
     ];
+    if (S.tutto) tessere.push(['cantiere', '', 'Cantieri', 'chi lavora dove, ogni mese', function () { vai('cantieri'); }]);
     if (S.admin) tessere.push(['scudo', '', 'Chi usa l’app', 'soci, agenzia e link', function () { vai('utenti'); }]);
     tessere.push([iscritto ? 'campana' : 'campanaNo', iscritto ? 'verde' : '', 'Notifiche', statoNotificheTesto(), function () { vai('notifiche'); }]);
     tessere.forEach(function (x, i) {
@@ -287,6 +298,7 @@
   };
 
   function cartaOggi(o) {
+    if (o.sabato) return cartaSabato(o);
     var fatto = !!o.giaFatto && o.completo, parte = !!o.giaFatto && !o.completo;
     var c = el('section', 'oggi-carta' + (fatto ? ' fatto' : ''));
     c.innerHTML =
@@ -298,6 +310,22 @@
         : o.persone + (o.persone === 1 ? ' persona' : ' persone') + ' da segnare') + '</p>' +
       (fatto && o.quando ? '<p class="quando">Salvato alle ' + testo(o.quando) + ' da ' + testo(o.giaFatto) + '</p>' : '');
     c.appendChild(bottone('vai', fatto ? ico('matita') + 'Rivedi o correggi' : ico('appello') + (parte ? 'Apri l’appello' : 'Fai l’appello'),
+      function () { vai('appello', S.oggi); }));
+    return c;
+  }
+
+  function cartaSabato(o) {
+    var fatto = !!o.giaFatto && o.completo, parte = !!o.giaFatto && !o.completo;
+    var c = el('section', 'oggi-carta' + (fatto ? ' fatto' : ''));
+    c.innerHTML =
+      '<span class="chip"><span class="pallino"></span>' + (fatto ? 'Fatto' : parte ? 'Fatto in parte' : 'Da fare') + '</span>' +
+      '<h2>Trasferte di oggi</h2>' +
+      '<p class="dettaglio">' + (fatto
+        ? '<span class="num">' + o.inTrasferta + '</span> in trasferta · <span class="num">' + euro(o.euro) + '</span>'
+        : parte ? 'Ha compilato ' + testo(o.giaFatto) + ': manca ancora l’altra squadra.'
+        : 'Sabato: si segna la trasferta di chi lavora') + '</p>' +
+      (fatto && o.quando ? '<p class="quando">Salvato alle ' + testo(o.quando) + ' da ' + testo(o.giaFatto) + '</p>' : '');
+    c.appendChild(bottone('vai', fatto ? ico('matita') + 'Rivedi o correggi' : ico('camion') + 'Segna le trasferte',
       function () { vai('appello', S.oggi); }));
     return c;
   }
@@ -392,7 +420,7 @@
     s.insertBefore(b, dopo ? dopo.nextSibling : s.firstChild);
   }
 
-  var PILLOLE = { ORD: ['spunta', '8 ore'], MEZ: ['orologio', '4 ore'], ASS: ['meno', 'Assente'], FER: ['calendario', 'Ferie'], FES: ['calendario', 'Festivo'] };
+  var PILLOLE = { ORD: ['spunta', '8 ore'], MEZ: ['orologio', '4 ore'], ASS: ['meno', 'Assente'], FER: ['calendario', 'Ferie'], FES: ['calendario', 'Festivo'], PIO: ['pioggia', 'Pioggia'] };
   function pillola(r) { return r.stato === 'ALT' ? ['orologio', r.ore + ' ore'] : PILLOLE[r.stato] || PILLOLE.ASS; }
 
   /**
@@ -430,6 +458,7 @@
 
   function disegnaAppello() {
     var A = S.appello;
+    if (A.sabato) { disegnaSabato(); return; }
     intesta('Appello', maiuscola(A.giorno), true);
     var s = schermo();
     if (!A.righe.length) { fondo(null); s.appendChild(nota('giallo', 'avviso', testo(S.avviso || 'Nessun dipendente da segnare.'))); return; }
@@ -438,6 +467,7 @@
       '<span class="contatore verde">' + ico('spunta', 'i-s') + '<b id="cOrd">0</b> 8 ore</span>' +
       '<span class="contatore ambra">' + ico('orologio', 'i-s') + '<b id="cMez">0</b> 4 ore</span>' +
       '<span class="contatore verde" id="cAltBox" hidden>' + ico('orologio', 'i-s') + '<b id="cAlt">0</b> altre</span>' +
+      '<span class="contatore blu" id="cPioBox" hidden>' + ico('pioggia', 'i-s') + '<b id="cPio">0</b> pioggia</span>' +
       '<span class="contatore grigio">' + ico('meno', 'i-s') + '<b id="cAss">0</b> assenti</span>'));
 
     if (A.giaFatto) {
@@ -445,7 +475,7 @@
         ? 'Già salvato da ' + testo(A.giaFatto) + (A.quando ? ' alle ' + testo(A.quando) : '') + '. Puoi correggere e confermare di nuovo.'
         : 'Compilato in parte da ' + testo(A.giaFatto) + ': le altre squadre mancano ancora.') + '</span>'));
     }
-    s.appendChild(el('p', 'aiuto', 'Sono tutti a <b>8 ore</b>. Tocca un nome per cambiarlo: <b>8 ore → assente → 4 ore → altre ore</b>.'));
+    s.appendChild(el('p', 'aiuto', 'Sono tutti a <b>8 ore</b>. Tocca un nome per cambiarlo: <b>8 ore → assente → 4 ore → pioggia → altre ore</b>.'));
 
     var lista = el('div', 'lista');
     var squadre = {};
@@ -489,14 +519,119 @@
     sc.appendChild(bottone(null, ico('spunta', 'i-s') + 'Tutti a 8 ore', function () { A.righe.forEach(function (r) { r.stato = 'ORD'; }); A.toccato = true; disegnaAppello(); }));
     sc.appendChild(bottone(null, ico('meno', 'i-s') + 'Tutti assenti', function () { A.righe.forEach(function (r) { r.stato = 'ASS'; }); A.toccato = true; disegnaAppello(); }));
     s.appendChild(sc);
+    var sc2 = el('div', 'scorciatoie');
+    sc2.appendChild(bottone(null, ico('pioggia', 'i-s') + 'Tutti: pioggia', function () { A.righe.forEach(function (r) { r.stato = 'PIO'; delete r.ore; }); A.toccato = true; disegnaAppello(); }));
+    s.appendChild(sc2);
 
     fondo('<button class="grosso" id="salva" type="button">' + ico('spunta') + '<span>Conferma</span><span class="ore" id="oreSalva"></span></button>');
     conta();
     $('salva').addEventListener('click', salvaAppello);
   }
 
+  // ------------------------------------------------------------------ il sabato: trasferte in euro
+  function euroDa(v) {
+    var t = String(v == null ? '' : v).replace(/\s|€/g, '').replace(',', '.');
+    if (t === '') return 0;
+    var n = Math.round(Number(t) * 100) / 100;
+    return isFinite(n) && n >= 0 ? n : NaN;
+  }
+  function disegnaSabato() {
+    var A = S.appello;
+    intesta('Trasferte', maiuscola(A.giorno), true);
+    var s = schermo();
+    if (!A.righe.length) { fondo(null); s.appendChild(nota('giallo', 'avviso', testo(S.avviso || 'Nessun dipendente da segnare.'))); return; }
+    A.righe.forEach(function (r) {
+      if (r.valore === undefined) r.valore = r.importo != null ? r.importo : (r.suggerito != null ? r.suggerito : 0);
+    });
+    s.appendChild(el('div', 'contatori',
+      '<span class="contatore verde">' + ico('camion', 'i-s') + '<b id="tN">0</b> in trasferta</span>' +
+      '<span class="contatore ambra">' + ico('euro', 'i-s') + '<b id="tE">0</b> €</span>'));
+    if (A.giaFatto) {
+      s.appendChild(el('div', 'banda', ico('info') + '<span>' + (A.completo
+        ? 'Già salvato da ' + testo(A.giaFatto) + (A.quando ? ' alle ' + testo(A.quando) : '') + '. Puoi correggere e confermare di nuovo.'
+        : 'Compilato in parte da ' + testo(A.giaFatto) + ': le altre squadre mancano ancora.') + '</span>'));
+    }
+    s.appendChild(el('p', 'aiuto', 'Il sabato non si segnano le ore: scrivi la <b>trasferta</b> di chi ha lavorato, <b>0</b> per chi non c’era. ' +
+      'Il numero già scritto è quello dell’ultima volta.'));
+
+    var lista = el('div', 'lista'), squadre = {}, ultima = null;
+    A.righe.forEach(function (r) { squadre[r.squadra || ''] = true; });
+    var piuSquadre = Object.keys(squadre).length > 1;
+    A.righe.forEach(function (r) {
+      if (piuSquadre && (r.squadra || '') !== ultima) {
+        ultima = r.squadra || '';
+        lista.appendChild(el('div', 'gruppo', ultima ? testo(ultima) : 'Senza squadra'));
+      }
+      var riga = el('label', 'riga statica trasferta');
+      riga.innerHTML = avatar(r.nome) + '<span class="nome">' + testo(r.nome) +
+        (r.suggerito != null ? '<small>ultima volta ' + euro(r.suggerito) + '</small>' : '') + '</span>';
+      var campo = el('span', 'euro-campo', '<span>€</span>');
+      var inp = el('input'); inp.type = 'text'; inp.inputMode = 'decimal'; inp.autocomplete = 'off';
+      inp.value = String(r.valore).replace('.', ',');
+      inp.setAttribute('aria-label', 'Trasferta di ' + r.nome);
+      inp.addEventListener('focus', function () { inp.select(); });
+      inp.addEventListener('input', function () { r.valore = inp.value; A.toccato = true; contaSabato(); });
+      campo.appendChild(inp); riga.appendChild(campo);
+      riga.setAttribute('data-s', euroDa(r.valore) > 0 ? 'ORD' : 'ASS');
+      r.el = riga;
+      lista.appendChild(riga);
+    });
+    s.appendChild(lista);
+    var sc = el('div', 'scorciatoie');
+    sc.appendChild(bottone(null, ico('rinnova', 'i-s') + 'Come l’ultima volta', function () {
+      A.righe.forEach(function (r) { r.valore = r.suggerito != null ? r.suggerito : 0; }); A.toccato = true; disegnaSabato();
+    }));
+    sc.appendChild(bottone(null, ico('meno', 'i-s') + 'Nessuno ha lavorato', function () {
+      A.righe.forEach(function (r) { r.valore = 0; }); A.toccato = true; disegnaSabato();
+    }));
+    s.appendChild(sc);
+    fondo('<button class="grosso" id="salva" type="button">' + ico('spunta') + '<span>Conferma</span><span class="ore" id="oreSalva"></span></button>');
+    contaSabato();
+    $('salva').addEventListener('click', salvaSabato);
+  }
+  function contaSabato() {
+    var n = 0, tot = 0;
+    S.appello.righe.forEach(function (r) {
+      var v = euroDa(r.valore);
+      if (v > 0) { n++; tot += v; }
+      if (r.el) r.el.setAttribute('data-s', v > 0 ? 'ORD' : isNaN(v) ? 'MEZ' : 'ASS');
+    });
+    if ($('tN')) { $('tN').textContent = n; $('tE').textContent = String(Math.round(tot * 100) / 100).replace('.', ','); }
+    if ($('oreSalva')) $('oreSalva').textContent = '· ' + euro(tot);
+  }
+  function salvaSabato() {
+    var A = S.appello, importi = {}, sbagliato = null;
+    A.righe.forEach(function (r) { var v = euroDa(r.valore); if (isNaN(v)) sbagliato = sbagliato || r.nome; importi[r.nome] = v; });
+    if (sbagliato) { avvisa('La cifra di ' + sbagliato + ' non è valida.', 1); return; }
+    var b = $('salva'); b.disabled = true;
+    azione('salvaSabato', { d: A.codice, importi: importi, impronta: A.impronta || '' }).then(function (r) {
+      b.disabled = false;
+      if (r.conflitto) {
+        avvisa(r.errore, 1);
+        S.appello = r.dati; S.appello.toccato = false;
+        if (A.codice === S.oggi) S.appelloOggi = copia(r.dati);
+        disegnaAppello();
+        return;
+      }
+      if (!r.ok && r.rete) {
+        metteInSospeso({ d: A.codice, giorno: A.giorno, sabato: true, importi: importi });
+        avvisa('Non riesco a inviarlo adesso: il sabato è salvato sul telefono e parte da solo appena possibile.');
+        if (A.codice === S.oggi) { S.home.oggi.giaFatto = S.utente; S.home.oggi.completo = !S.tutto; }
+        setTimeout(tornaHome, 1800);
+        return;
+      }
+      if (!r.ok) { avvisa(r.errore, 1); return; }
+      togliDaSospese(function (x) { return x.d === A.codice; });
+      var fatto = mostraSuccesso('Trasferte salvate', maiuscola(A.giorno) + ' · ' + r.messaggio);
+      var dati = Promise.all([aggiornaHomeDiNascosto(true), carica('appello', S.oggi, true)]).then(function (x) {
+        if (x[1]) S.appelloOggi = copia(x[1]);
+      });
+      Promise.all([fatto, dati]).then(tornaHome);
+    });
+  }
+
   function conta() {
-    var c = { ORD: 0, MEZ: 0, ALT: 0, ASS: 0 }, ore = 0;
+    var c = { ORD: 0, MEZ: 0, ALT: 0, ASS: 0, PIO: 0 }, ore = 0;
     S.appello.righe.forEach(function (r) {
       var def = S.codici[r.stato];
       if (c[r.stato] !== undefined) c[r.stato]++;
@@ -505,6 +640,7 @@
     if ($('cOrd')) {
       $('cOrd').textContent = c.ORD; $('cMez').textContent = c.MEZ; $('cAss').textContent = c.ASS;
       $('cAlt').textContent = c.ALT; $('cAltBox').hidden = !c.ALT;
+      $('cPio').textContent = c.PIO; $('cPioBox').hidden = !c.PIO;
     }
     if ($('oreSalva')) $('oreSalva').textContent = '· ' + ore + ' ore';
   }
@@ -560,7 +696,9 @@
     var chiuse = {}, rimaste = 0, inviate = 0;          // chiuse = inviate o rifiutate per un motivo vero
     lista.reduce(function (p, g) {
       return p.then(function () {
-        return chiama('api/azione', { azione: 'salvaAppello', carico: { d: g.d, stati: g.stati } }).then(function (r) {
+        var carico = g.sabato ? { azione: 'salvaSabato', carico: { d: g.d, importi: g.importi } }
+          : { azione: 'salvaAppello', carico: { d: g.d, stati: g.stati } };
+        return chiama('api/azione', carico).then(function (r) {
           if (r.ok) { inviate++; chiuse[g.id] = true; }
           else if (r.rete) rimaste++;
           else { chiuse[g.id] = true; avvisa('Non ho potuto inviare ' + g.giorno + ': ' + r.errore, 1); }
@@ -621,6 +759,7 @@
       '<div class="cifra">' + d.oreTotali + '<small>ore</small></div>' +
       '<div class="righe"><span><b>' + gg + '</b> giornate</span>' +
       (extra ? '<span><b>' + euro(extra) + '</b> di extra</span>' : '') +
+      (d.trasferteTotali ? '<span><b>' + euro(d.trasferteTotali) + '</b> di trasferte</span>' : '') +
       (d.mancanti && d.mancanti.length ? '<span style="color:var(--rosso)"><b style="color:inherit">' + d.mancanti.length + '</b> ' + (S.tutto ? 'da completare' : d.mancanti.length === 1 ? 'giorno vuoto' : 'giorni vuoti') + '</span>' : '') +
       '</div>');
   }
@@ -633,15 +772,18 @@
       var pct = function (n) { return Math.min(100, Math.round(n / pieno * 100)) + '%'; };
       var r = el('div', 'persona' + (p.gg || p.fer || p.fes ? '' : ' vuota-p'),
         avatar(p.nome) +
-        '<span class="chi">' + testo(p.nome) + (S.tutto && p.squadra ? ' <small>· ' + testo(etichettaSq(p.squadra)) + '</small>' : '') + '</span>' +
+        '<span class="chi">' + testo(p.nome) + (S.tutto && p.squadra ? ' <small>· ' + testo(etichettaSq(p.squadra)) + '</small>' : '') +
+        (p.cantiere ? ' <small>· ' + testo(p.cantiere) + '</small>' : '') + '</span>' +
         '<span class="val">' + p.gg + ' gg <small>· ' + p.ore + ' h</small></span>' +
         '<span class="barra"><i style="width:' + pct(interi) + '"></i><i class="mezza" style="width:' + pct(p.mezze) + '"></i>' +
         '<i class="ferie" style="width:' + pct(p.fer) + '"></i></span>');
-      if (p.mezze || p.fer || p.fes) {
+      if (p.mezze || p.fer || p.fes || p.pio || p.trasferte) {
         var ch = el('span', 'chips');
         if (p.mezze) ch.appendChild(el('span', null, p.mezze + (p.mezze === 1 ? ' mezza giornata' : ' mezze giornate')));
         if (p.fer) ch.appendChild(el('span', 'fer', p.fer + ' ferie'));
         if (p.fes) ch.appendChild(el('span', 'fer', p.fes + ' festivi'));
+        if (p.pio) ch.appendChild(el('span', 'fer', p.pio + (p.pio === 1 ? ' giorno di pioggia' : ' giorni di pioggia')));
+        if (p.trasferte) ch.appendChild(el('span', null, euro(p.trasferte) + ' di trasferte (' + p.sabati + (p.sabati === 1 ? ' sabato)' : ' sabati)')));
         r.appendChild(ch);
       }
       c.appendChild(r);
@@ -726,60 +868,73 @@
       var m = mancanti(d); if (m) s.appendChild(m);
 
       if (d.scaricabile) {
-        var a = el('a', 'scarica', '<span class="icona">' + ico('foglio') + '</span><span><b>Foglio per l’agenzia</b>' +
-          '<span>Excel di ' + testo(d.titolo) + ': un blocco per dipendente, più i totali</span></span>' + ico('scarica', 'dx'));
-        a.href = BASE + 'foglio/' + d.mese + '.xlsx';
-        a.setAttribute('download', '');
-        s.appendChild(a);
-        if (d.agenzia) s.appendChild(bottoneInvia(d, a.href));
+        var pdf = el('a', 'scarica', '<span class="icona">' + ico('foglio') + '</span><span><b>Documento PDF</b>' +
+          '<span>' + testo(maiuscola(d.titolo)) + ': griglia, riepilogo e trasferte</span></span>' + ico('scarica', 'dx'));
+        pdf.href = BASE + 'foglio/' + d.mese + '.pdf';
+        pdf.setAttribute('download', '');
+        s.appendChild(pdf);
+        if (d.commercialista) s.appendChild(bottoneMail(d, pdf.href));
+        var xls = el('a', 'scarica', '<span class="icona">' + ico('grafico') + '</span><span><b>Excel per le modifiche</b>' +
+          '<span>Lo stesso mese in Excel, da ritoccare se serve</span></span>' + ico('scarica', 'dx'));
+        xls.href = BASE + 'foglio/' + d.mese + '.xlsx';
+        xls.setAttribute('download', '');
+        xls.style.marginTop = '10px';
+        s.appendChild(xls);
       } else if (S.tutto) {
-        s.appendChild(nota('grigio', 'info', 'Il foglio per l’agenzia si scarica quando tutte le squadre hanno compilato tutti i giorni del mese' +
-          (d.daCompletare && d.daCompletare.length ? ': mancano ancora i giorni <b>' + d.daCompletare.join(', ') + '</b>.' : '.')));
+        var nm = nota('grigio', 'info', 'Il documento del mese (PDF ed Excel) si scarica quando tutte le squadre hanno compilato tutti i giorni ' +
+          'e i cantieri del mese sono confermati. ' + testo(d.motivo || '') +
+          (d.senzaCantiere && d.senzaCantiere.length ? ' Senza cantiere: <b>' + d.senzaCantiere.map(testo).join(', ') + '</b>.' : ''));
+        if (d.cantieriConfermati === false) {
+          nm.querySelector('.corpo').appendChild(bottone('mini', ico('cantiere') + 'Vai ai cantieri', function () {
+            vai('cantieri', d.mese.slice(0, 4) + '-' + d.mese.slice(4));
+          }));
+        }
+        s.appendChild(nm);
       }
 
       s.appendChild(sezione('Per persona'));
       s.appendChild(cartaPersone(d));
       if (d.extra && d.extra.length) { s.appendChild(sezione('Compensi extra')); s.appendChild(cartaExtra(d)); }
       if (!S.tutto) {
-        s.appendChild(nota('grigio', 'info', 'Il foglio per l’agenzia lo prepara ' + testo(nomeAdmin()) + '. Se qualcosa non torna, diglielo prima che parta.'));
+        s.appendChild(nota('grigio', 'info', 'Il documento del mese lo prepara ' + testo(nomeAdmin()) + ' con l’agenzia. Se qualcosa non torna, diglielo prima che parta.'));
       }
     });
   };
 
   /**
-   * "Invia a Gama srl": sul telefono si apre Condividi con il foglio gia' allegato
-   * (si sceglie Mail; l'indirizzo e' gia' copiato, basta incollarlo). Dove Condividi
-   * con i file non c'e' (computer), si scarica il foglio e si apre una mail gia' indirizzata.
+   * "Prepara mail per Studio Corvasce": nessuna mail parte dal server.
+   * - Telefono: si apre Condividi con il PDF gia' allegato; si sceglie Gmail (bozza pronta),
+   *   l'indirizzo e' gia' copiato e si incolla.
+   * - Computer: si scarica il PDF e si apre Gmail (quello in cui si e' entrati) con la bozza
+   *   gia' indirizzata, oggetto e testo: resta da trascinare dentro il PDF appena scaricato.
    * Il file si prepara subito: Safari apre Condividi solo se lo si chiama al tocco, senza attese.
    */
-  function bottoneInvia(d, href) {
-    var ag = d.agenzia, nomeFile = 'Presenze ' + d.titolo.toUpperCase() + '.xlsx';
-    var oggetto = 'Presenze ' + d.titolo.toUpperCase();
-    var corpo = 'Buongiorno,\nin allegato il foglio presenze di ' + d.titolo + '.\n\n' + S.utente;
+  function bottoneMail(d, href) {
+    var c = d.commercialista, nomeFile = 'Presenze ' + d.titolo.toUpperCase() + '.pdf';
+    var oggetto = 'Presenze ' + d.titolo.toUpperCase() + ' - ' + (d.ditta || 'GAMA');
+    var corpo = 'Buongiorno,\nin allegato il documento presenze di ' + d.titolo + ' (griglia del mese, riepilogo e trasferte).\n\n' +
+      'Cordiali saluti,\n' + S.utente;
+    var telefono = iPhone() || /android/i.test(navigator.userAgent);
     var file = null;
     fetch(href, { cache: 'no-store' }).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
-      if (b && window.File) file = new File([b], nomeFile, { type: b.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    }, function () { /* senza campo: si ritenta al tocco con la mail */ });
+      if (b && window.File) file = new File([b], nomeFile, { type: 'application/pdf' });
+    }, function () { /* senza campo: al tocco si scarica e basta */ });
 
-    var b = bottone('scarica', '<span class="icona">' + ico('condividi') + '</span><span><b>Invia a ' + testo(ag.nome) + '</b>' +
-      '<span>' + testo(ag.email) + '</span></span>' + ico('avanti', 'dx'), function () {
-      try { if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(ag.email).catch(function () {}); } catch (e) { /* non importa */ }
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: oggetto, text: corpo }).then(function () {
-          avvisa('Fatto. Controlla che la mail sia partita per ' + ag.email + '.');
-        }, function (e) {
-          if (!e || e.name !== 'AbortError') avvisa('Condividi non si è aperto: scarica il foglio e mandalo a ' + ag.email + '.', 1);
+    var b = bottone('scarica', '<span class="icona">' + ico('invia') + '</span><span><b>Prepara mail per ' + testo(c.nome) + '</b>' +
+      '<span>' + testo(c.email) + (telefono ? ' · si apre Condividi con il PDF' : ' · si apre Gmail con la bozza') + '</span></span>' + ico('avanti', 'dx'), function () {
+      try { if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(c.email).catch(function () {}); } catch (e) { /* non importa */ }
+      if (telefono && file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: oggetto, text: corpo }).catch(function (e) {
+          if (!e || e.name !== 'AbortError') avvisa('Condividi non si è aperto: scarica il PDF e mandalo a ' + c.email + '.', 1);
         });
-        avvisa('Scegli Mail e come destinatario incolla ' + ag.email + '.');
+        avvisa('Scegli Gmail e come destinatario incolla ' + c.email + ' (è già copiato).');
         return;
       }
       var giu = el('a'); giu.href = href; giu.setAttribute('download', nomeFile);
       document.body.appendChild(giu); giu.click(); giu.remove();
-      setTimeout(function () {
-        location.href = 'mailto:' + ag.email + '?subject=' + encodeURIComponent(oggetto) +
-          '&body=' + encodeURIComponent(corpo + '\n\n(allegare il file ' + nomeFile + ' appena scaricato)');
-      }, 600);
-      avvisa('Il foglio è stato scaricato: allegalo alla mail che si sta aprendo.');
+      window.open('https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(c.email) +
+        '&su=' + encodeURIComponent(oggetto) + '&body=' + encodeURIComponent(corpo), '_blank', 'noopener');
+      avvisa('PDF scaricato e bozza aperta in Gmail: trascina dentro il file ' + nomeFile + '.');
     });
     b.style.marginTop = '10px';
     return b;
@@ -880,6 +1035,14 @@
       r.setAttribute('data-s', x.attivo ? 'ORD' : 'ASS');
       r.innerHTML = avatar(x.nome);
       var nomeEl = el('div', 'nome', testo(x.nome));
+      if (x.attivo) {
+        nomeEl.appendChild(el('br'));
+        var cb = bottone('cambia' + (x.cantiere ? '' : ' vuota'), ico('cantiere', 'i-xs') + testo(x.cantiere || 'senza cantiere'), function () {
+          if (!S.tutto) { avvisa('Il cantiere lo assegnano ' + testo(nomeAdmin()) + ' e l’agenzia.'); return; }
+          sceltaCantiere(x.nome, null, function (r) { if (r.ok) { x.cantiere = r.cantiere; disegnaOrganico(); } });
+        });
+        nomeEl.appendChild(cb);
+      }
       if (S.tutto) {
         nomeEl.appendChild(el('br'));
         nomeEl.appendChild(bottone('cambia' + (x.squadra ? '' : ' vuota'), ico('scambia', 'i-xs') + testo(etichettaSq(x.squadra)), function () {
@@ -907,6 +1070,144 @@
     s.appendChild(lista);
     fondo('<button class="grosso blu" id="nuovo" type="button">' + ico('piu') + 'Aggiungi un dipendente</button>');
     $('nuovo').addEventListener('click', function () { vai('nuovoDipendente'); });
+  }
+
+  // ------------------------------------------------------------------ cantieri (amministratore e agenzia)
+  function meseOggi() { return S.oggi.slice(0, 4) + '-' + S.oggi.slice(4, 6); }
+
+  /** Il pannello dal basso con l'elenco dei cantieri attivi: sceglie e salva subito. */
+  function sceltaCantiere(nome, mese, fatto) {
+    mese = mese || meseOggi();
+    carica('cantieri', mese).then(function (d) {
+      if (!d) return;
+      var attivi = d.elenco.filter(function (c) { return c.attivo; });
+      var io = d.dipendenti.filter(function (x) { return x.nome === nome; })[0];
+      var attuale = io && io.cantiere ? io.cantiere.id : null;
+      var prima = document.activeElement;
+      var fondale = el('div', 'pannello-ore');
+      var p = el('div', 'pannello', '<h2 id="pannelloTit">Cantiere di ' + testo(d.nome) + '</h2><p>' + testo(nome) + '</p>');
+      p.setAttribute('role', 'dialog'); p.setAttribute('aria-modal', 'true'); p.setAttribute('aria-labelledby', 'pannelloTit');
+      function chiudi() { document.removeEventListener('keydown', tasto); fondale.remove(); if (prima && prima.focus) prima.focus(); }
+      function tasto(e) { if (e.key === 'Escape') chiudi(); }
+      function scegli(id) {
+        chiudi();
+        azione('assegnaCantiere', { nome: nome, mese: mese, cantiere: id }).then(function (r) {
+          if (!r.ok) { avvisa(r.errore, 1); return; }
+          vibra(); avvisa(r.messaggio);
+          var ora = r.dati.dipendenti.filter(function (x) { return x.nome === nome; })[0];
+          fatto({ ok: true, cantiere: ora && ora.cantiere ? ora.cantiere.nome : '', dati: r.dati });
+        });
+      }
+      var lista = el('div', 'lista-cantieri');
+      if (!attivi.length) lista.appendChild(el('p', 'aiuto', 'Non c’è ancora nessun cantiere: aggiungilo dalla schermata <b>Cantieri</b>.'));
+      attivi.forEach(function (c) {
+        var b = bottone(c.id === attuale ? 'scelta' : null, ico('cantiere', 'i-s') + testo(c.nome), function () { scegli(c.id); });
+        lista.appendChild(b);
+      });
+      p.appendChild(lista);
+      p.appendChild(bottone('annulla', 'Annulla', chiudi));
+      fondale.appendChild(p);
+      fondale.addEventListener('click', function (e) { if (e.target === fondale) chiudi(); });
+      document.addEventListener('keydown', tasto);
+      document.body.appendChild(fondale);
+      var primo = lista.querySelector('button'); if (primo) primo.focus();
+    });
+  }
+
+  VISTE.cantieri = function (mese) {
+    if (!S.tutto) { tornaHome(); return; }
+    mese = mese || meseOggi();
+    var mio = turno;
+    intesta('Cantieri', '', true); fondo(null); sagoma('lista');
+    carica('cantieri', mese).then(function (d) {
+      if (mio !== turno) return;
+      if (!d) { tornaHome(); return; }
+      disegnaCantieri(d);
+    });
+  };
+
+  function disegnaCantieri(d) {
+    intesta('Cantieri', maiuscola(d.titolo), true);
+    var s = schermo();
+
+    var p = el('div', 'pillole');
+    d.mesi.forEach(function (m) {
+      var b = bottone(null, maiuscola(m.nome), function () {
+        history.replaceState({ vista: 'cantieri', param: m.mese, d: (history.state && history.state.d) || 1 }, '', location.pathname);
+        turno++; VISTE.cantieri(m.mese);
+      });
+      b.setAttribute('aria-pressed', m.mese === d.mese ? 'true' : 'false');
+      p.appendChild(b);
+    });
+    s.appendChild(p);
+
+    var senza = d.dipendenti.filter(function (x) { return !x.cantiere; }).length;
+    if (d.conferma) {
+      var quando = d.conferma.quando.slice(8, 10) + '/' + d.conferma.quando.slice(5, 7) + ' alle ' + d.conferma.quando.slice(11, 16);
+      s.appendChild(nota(d.conferma.modificatoDopo ? 'giallo' : 'verde', d.conferma.modificatoDopo ? 'avviso' : 'spunta',
+        'Confermati da <b>' + testo(d.conferma.da) + '</b> il ' + testo(quando) + '.' +
+        (d.conferma.modificatoDopo ? ' Poi ' + testo(d.conferma.modificatoDopo) + ' ha cambiato qualcosa: controlla e conferma di nuovo.' : '')));
+    } else {
+      s.appendChild(nota('giallo', 'avviso', '<b>Da confermare.</b> Controlla dove lavora ognuno a ' + testo(d.nome) +
+        ' e conferma in fondo. Chi non è cambiato tiene il cantiere del mese prima.'));
+    }
+    if (senza) s.appendChild(nota('rosso', 'avviso', '<b>' + senza + (senza === 1 ? ' persona' : ' persone') + ' senza cantiere</b>: sono in cima.'));
+
+    s.appendChild(sezione('Chi lavora dove'));
+    var lista = el('div', 'lista');
+    d.dipendenti.forEach(function (x) {
+      var b = bottone('riga',
+        avatar(x.nome) + '<span class="nome">' + testo(x.nome) +
+        '<small>' + (x.cantiere ? testo(x.cantiere.nome) + (x.cantiere.ereditato ? ' · come il mese prima' : '') : 'senza cantiere') + '</small></span>' +
+        ico('avanti', 'i-s freccia'),
+        function () { sceltaCantiere(x.nome, d.mese, function (r) { if (r.ok) disegnaCantieri(r.dati); }); });
+      b.setAttribute('data-s', x.cantiere ? 'ORD' : 'ASS');
+      lista.appendChild(b);
+    });
+    s.appendChild(lista);
+
+    s.appendChild(sezione('Elenco dei cantieri'));
+    var el2 = el('div', 'lista');
+    d.elenco.forEach(function (c) {
+      var r = el('div', 'riga statica' + (c.attivo ? '' : ' spenta'));
+      r.setAttribute('data-s', c.attivo ? 'ORD' : 'ASS');
+      r.innerHTML = '<span class="avatar">' + ico('cantiere', 'i-s') + '</span><span class="nome">' + testo(c.nome) + '</span>';
+      var sw = bottone('interruttore', '', function () {
+        azione('attivaCantiere', { id: c.id, attivo: !c.attivo }).then(function (e) {
+          if (!e.ok) { avvisa(e.errore, 1); return; }
+          vibra(); avvisa(e.messaggio); turno++; VISTE.cantieri(d.mese);
+        });
+      });
+      sw.setAttribute('role', 'switch');
+      sw.setAttribute('aria-checked', c.attivo ? 'true' : 'false');
+      sw.setAttribute('aria-label', c.nome + (c.attivo ? ': attivo' : ': non attivo'));
+      r.appendChild(sw);
+      el2.appendChild(r);
+    });
+    s.appendChild(el2);
+    s.appendChild(el('div', 'campo', '<label for="nuovoCantiere">Nuovo cantiere</label>' +
+      '<input id="nuovoCantiere" type="text" maxlength="60" placeholder="es. Via Roma - Bari" autocomplete="off">'));
+    s.appendChild(bottone('grosso blu', ico('piu') + 'Aggiungi il cantiere', function () {
+      var v = String($('nuovoCantiere').value || '').trim();
+      if (v.length < 2) { avvisa('Scrivi il nome del cantiere.', 1); return; }
+      azione('nuovoCantiere', { nome: v }).then(function (e) {
+        if (!e.ok) { avvisa(e.errore, 1); return; }
+        vibra(); avvisa(e.messaggio); turno++; VISTE.cantieri(d.mese);
+      });
+    }));
+
+    fondo('<button class="grosso" id="conferma" type="button">' + ico('spunta') + 'Conferma i cantieri di ' + testo(d.nome) + '</button>');
+    $('conferma').addEventListener('click', function () {
+      var b = this; b.disabled = true;
+      azione('confermaCantieri', { mese: d.mese }).then(function (e) {
+        b.disabled = false;
+        if (!e.ok) { avvisa(e.errore, 1); return; }
+        mostraSuccesso('Cantieri confermati', maiuscola(d.titolo)).then(function () {
+          disegnaCantieri(e.dati);
+          aggiornaHomeDiNascosto(true);
+        });
+      });
+    });
   }
 
   function scelte(opzioni, scelta, quando) {

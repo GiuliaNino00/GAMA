@@ -6,8 +6,8 @@
  *   npm run cli -- nuovo-agenzia "Studio Rossi" (vede e corregge tutto, gestisce i dipendenti, non gli utenti)
  *   npm run cli -- link                      (elenca i link personali)
  *   npm run cli -- nuovo-link "Matteo"       (il vecchio smette di funzionare)
- *   npm run cli -- foglio 202609 [file.xlsx] (salva il foglio di settembre 2026, solo se completo;
- *                                             --anche-incompleto per farlo lo stesso)
+ *   npm run cli -- foglio 202609 [file] [--pdf] (salva il foglio di settembre 2026 in Excel, o in PDF con --pdf;
+ *                                             solo se completo, --anche-incompleto per farlo lo stesso)
  *   npm run cli -- prova-notifica "Giuliano"
  *   npm run cli -- backup
  */
@@ -17,6 +17,7 @@ import { CFG, env } from './config.js';
 import { apri, percorsoDb, backup } from './db.js';
 import * as Q from './dati.js';
 import { foglioMese, nomeScheda } from './foglio.js';
+import { documentoMese } from './documento.js';
 import { creaNotifiche } from './notifiche.js';
 import { nomeUtente } from './nomi.js';
 
@@ -56,12 +57,13 @@ switch (comando) {
     const m = String(arg[0] || '').match(/^(\d{4})(0[1-9]|1[0-2])$/);
     if (!m) esci('Indica il mese come AAAAMM, per esempio 202609.');
     const anno = Number(m[1]), mese0 = Number(m[2]) - 1;
-    const manca = Q.mancantiPerIlFoglio(db, anno, mese0);
-    if (manca.length && !arg.includes('--anche-incompleto')) {
-      esci('Il mese non è completo, mancano i giorni ' + manca.join(', ') + '. Per farlo lo stesso aggiungi --anche-incompleto');
+    const pdf = arg.includes('--pdf');
+    const pronto = Q.prontoPerIlFoglio(db, anno, mese0);
+    if (!pronto.ok && !arg.includes('--anche-incompleto')) {
+      esci(Q.motivoFoglio(pronto, CFG.MESI[mese0].toLowerCase()) + ' Per farlo lo stesso aggiungi --anche-incompleto');
     }
-    const file = arg.slice(1).find((a) => a !== '--anche-incompleto') || 'Presenze ' + nomeScheda(anno, mese0) + '.xlsx';
-    fs.writeFileSync(file, await foglioMese(db, anno, mese0));
+    const file = arg.slice(1).find((a) => !a.startsWith('--')) || 'Presenze ' + nomeScheda(anno, mese0) + (pdf ? '.pdf' : '.xlsx');
+    fs.writeFileSync(file, pdf ? await documentoMese(db, anno, mese0) : await foglioMese(db, anno, mese0));
     console.log('Scritto ' + file);
     break;
   }
@@ -84,7 +86,7 @@ switch (comando) {
       '  nuovo-agenzia "Nome"          crea un utente Agenzia (tutto tranne utenti e link)',
       '  link                          elenca i link personali',
       '  nuovo-link "Nome"             nuovo link per un utente (il vecchio smette di andare)',
-      '  foglio AAAAMM [file.xlsx]     salva il foglio presenze di un mese (solo se completo)',
+      '  foglio AAAAMM [file] [--pdf]  salva il documento del mese, Excel o PDF (solo se completo)',
       '  prova-notifica "Nome"         manda una notifica di prova',
       '  backup                        copia di sicurezza del database adesso'
     ].join('\n'));

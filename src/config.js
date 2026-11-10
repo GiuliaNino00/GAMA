@@ -12,7 +12,7 @@ export const CFG = {
   // Chi e' amministratore vede e modifica tutto.
   SQUADRE: ['MURATORI', 'CARPENTIERI'],
 
-  // riga = in quale riga del foglio mensile finisce (ord. / fer / fes)
+  // riga = in quale riga del foglio mensile finisce (ord. / fer / fes / pioggia)
   CODICI: {
     ORD: { etichetta: '8 ore',          breve: '8 ore',   riga: 'ord.', ore: 8, emoji: '✅' },
     MEZ: { etichetta: 'mezza giornata', breve: '4 ore',   riga: 'ord.', ore: 4, emoji: '🕓' },
@@ -20,11 +20,13 @@ export const CFG = {
     ALT: { etichetta: 'altre ore',      breve: 'altre ore', riga: 'ord.', ore: null, emoji: '⏱️' },
     FER: { etichetta: 'ferie',          breve: 'ferie',   riga: 'fer',  ore: 8, emoji: '🏖️' },
     FES: { etichetta: 'festivo',        breve: 'festivo', riga: 'fes',  ore: 8, emoji: '🎉' },
+    // la pioggia non e' lavoro e non e' assenza: ha la sua riga e il suo totale
+    PIO: { etichetta: 'pioggia',        breve: 'pioggia', riga: 'pioggia', ore: 8, emoji: '🌧️' },
     ASS: { etichetta: 'assente',        breve: 'assente', riga: null,   ore: 0, emoji: '⬜' }
   },
 
-  // Toccando un nome: 8 ore -> assente -> 4 ore -> altre ore (si sceglie quante) -> di nuovo 8 ore.
-  CICLO: ['ORD', 'ASS', 'MEZ', 'ALT'],
+  // Toccando un nome: 8 ore -> assente -> 4 ore -> pioggia -> altre ore (si sceglie quante) -> di nuovo 8 ore.
+  CICLO: ['ORD', 'ASS', 'MEZ', 'PIO', 'ALT'],
 
   // Le ore che si possono scegliere con "altre ore": da 1 a 12, tranne 4 e 8,
   // che sono gia' la mezza giornata e la giornata intera.
@@ -42,8 +44,17 @@ export const CFG = {
   APPELLO_ANCHE_SABATO: true,
   APPELLO_ANCHE_DOMENICA: false,
 
-  // A chi va il foglio del mese (pulsante "Invia" dell'amministratore)
-  AGENZIA: { nome: 'Gama srl', email: 'gamasrl2026@gmail.com' },
+  // Il sabato non si segna a ore: si segna la trasferta in euro di ognuno.
+  TRASFERTA_MAX: 10000,
+
+  // I cantieri del mese: l'agenzia li conferma. L'avviso parte negli ultimi giorni
+  // del mese prima (per il mese nuovo) e continua finche' non sono confermati.
+  GIORNI_PRIMA_CANTIERI: 3,
+  ORA_CANTIERI: 9,
+
+  // A chi va il documento del mese (bozza di mail di amministratore e agenzia)
+  COMMERCIALISTA: { nome: 'Studio Corvasce', email: 'studiocorvasceconsulenza@gmail.com' },
+  NOME_DITTA: 'GAMA',
 
   MESI: ['GENNAIO', 'FEBBRAIO', 'MARZO', 'APRILE', 'MAGGIO', 'GIUGNO',
          'LUGLIO', 'AGOSTO', 'SETTEMBRE', 'OTTOBRE', 'NOVEMBRE', 'DICEMBRE'],

@@ -39,11 +39,20 @@ export function notificheFinte() {
   };
 }
 
-/** Compila ogni giorno di lavoro di un mese per entrambe le squadre (tranne i giorni `salta`). */
+/**
+ * Compila ogni giorno di lavoro di un mese per entrambe le squadre (tranne i giorni `salta`):
+ * dal lunedi' al venerdi' le presenze, il sabato le trasferte.
+ */
 export function compilaMese(db, anno, mese0, salta = []) {
   for (let d = new Date(anno, mese0, 1); d.getMonth() === mese0; d = new Date(anno, mese0, d.getDate() + 1)) {
     if (d.getDay() === 0 || salta.includes(d.getDate())) continue;
     const k = anno + '-' + String(mese0 + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    Q.salvaPresenze(db, k, { 'PIPERIS P.': 'ORD', "D'AMORE E.": 'ORD' }, 'prova');
+    if (d.getDay() === 6) Q.salvaSabato(db, k, { 'PIPERIS P.': 0, "D'AMORE E.": 0 }, 'prova');
+    else Q.salvaPresenze(db, k, { 'PIPERIS P.': 'ORD', "D'AMORE E.": 'ORD' }, 'prova');
   }
+}
+
+/** Conferma i cantieri di un mese (serve al foglio insieme ai giorni compilati). */
+export function confermaMese(db, anno, mese0) {
+  Q.confermaCantieri(db, anno + '-' + String(mese0 + 1).padStart(2, '0'), 'prova');
 }

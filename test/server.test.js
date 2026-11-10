@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
-import { banco, ADESSO, compilaMese } from './aiuto.js';
+import { banco, ADESSO, compilaMese, confermaMese } from './aiuto.js';
 import { creaApp } from '../src/server.js';
 import { creaNotifiche } from '../src/notifiche.js';
 import * as Q from '../src/dati.js';
@@ -88,6 +88,10 @@ test('il foglio del mese lo scarica solo l\'amministratore, e solo a mese comple
   assert.equal(incompleto.status, 409);
   assert.match(await incompleto.text(), /mancano ancora i giorni 1, 2, 3/);
   compilaMese(B.db, 2026, 7);
+  const senzaConferma = await fetch(link(B.giuliano) + 'foglio/202608.pdf');
+  assert.equal(senzaConferma.status, 409);
+  assert.match(await senzaConferma.text(), /cantieri di agosto non sono ancora confermati/);
+  confermaMese(B.db, 2026, 7);
   const ag = Q.creaUtente(B.db, { nome: 'Studio Paghe', agenzia: true });
   assert.equal((await fetch(link(ag) + 'foglio/202608.xlsx')).status, 200, 'anche l\'agenzia lo scarica');
   assert.equal((await post(ag, 'api/carica', { vista: 'utenti' })).ok, false, 'ma non vede gli utenti');

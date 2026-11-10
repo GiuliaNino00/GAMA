@@ -317,6 +317,179 @@ export function presenzeIntervallo(db, dal, al) {
     .all(D.chiave(dal), D.chiave(al));
 }
 
+/** Chi e' stato segnato e quando, contando anche le trasferte del sabato: [{ data, dipendenteId }]. */
+export function compilazioniIntervallo(db, dal, al) {
+  return db.prepare(
+    'SELECT data, dipendente_id AS dipendenteId FROM presenze WHERE data BETWEEN ? AND ? ' +
+    'UNION ALL SELECT data, dipendente_id FROM sabati WHERE data BETWEEN ? AND ? ORDER BY 1')
+    .all(D.chiave(dal), D.chiave(al), D.chiave(dal), D.chiave(al));
+}
+
+// ---------------------------------------------------------------- trasferte del sabato
+
+/** Arrotonda e controlla una cifra in euro: null se non va (0 vuol dire "non ha lavorato"). */
+export function euroValido(v) {
+  if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
+  const n = Math.round(Number(String(v).replace(',', '.')) * 100) / 100;
+  return Number.isFinite(n) && n >= 0 && n <= CFG.TRASFERTA_MAX ? n : null;
+}
+
+/** Salva (o corregge) le trasferte di un sabato: { "ROSSI M.": 50, ... }. Tutto o niente. */
+export function salvaSabato(db, dataChiave, importi, inseritoDa) {
+  const trova = db.prepare('SELECT id FROM dipendenti WHERE nome = ?');
+  const scrivi = db.prepare(
+    'INSERT INTO sabati (data, dipendente_id, importo, inserito_da, aggiornato) VALUES (?, ?, ?, ?, ?) ' +
+    'ON CONFLICT(data, dipendente_id) DO UPDATE SET importo = excluded.importo, ' +
+    'inserito_da = excluded.inserito_da, aggiornato = excluded.aggiornato');
+  const quando = D.timbro();
+  let quanti = 0;
+  db.transaction(() => {
+    for (const [nome, v] of Object.entries(importi)) {
+      const d = trova.get(nome);
+      const euro = euroValido(v);
+      if (!d || euro === null) continue;
+      scrivi.run(dataChiave, d.id, euro, inseritoDa, quando);
+      quanti++;
+    }
+  })();
+  registra(db, 'TRASFERTE', dataChiave + ': ' + quanti + ' righe da ' + inseritoDa);
+  return quanti;
+}
+
+/** { "ROSSI M.": { importo, inseritoDa } } per un sabato. */
+export function sabatoDelGiorno(db, dataChiave) {
+  const out = {};
+  db.prepare('SELECT d.nome, s.importo, s.inserito_da FROM sabati s JOIN dipendenti d ON d.id = s.dipendente_id WHERE s.data = ?')
+    .all(dataChiave)
+    .forEach((r) => { out[r.nome] = { importo: r.importo, inseritoDa: r.inserito_da }; });
+  return out;
+}
+
+export function sabatiIntervallo(db, dal, al) {
+  return db.prepare(
+    'SELECT s.data, d.nome, d.id AS dipendenteId, s.importo FROM sabati s JOIN dipendenti d ON d.id = s.dipendente_id ' +
+    'WHERE s.data BETWEEN ? AND ? ORDER BY s.data').all(D.chiave(dal), D.chiave(al));
+}
+
+/** Come improntaGiorno, ma per le trasferte di un sabato. */
+export function improntaSabato(db, dataChiave, ids) {
+  if (!ids.length) return { impronta: '', quando: '' };
+  const r = db.prepare('SELECT MAX(aggiornato) AS m, COUNT(*) AS n FROM sabati WHERE data = ? AND dipendente_id IN (' +
+    ids.map(() => '?').join(',') + ')').get(dataChiave, ...ids);
+  return { impronta: r.n ? r.m + '|' + r.n : '', quando: r.m ? r.m.slice(11, 16) : '' };
+}
+
+/** Il consiglio per ogni dipendente: l'ultima trasferta maggiore di zero di un sabato precedente. id -> euro */
+export function suggerimentiSabato(db, dataChiave, ids) {
+  const out = new Map();
+  if (!ids.length) return out;
+  db.prepare('SELECT s.dipendente_id AS id, s.importo FROM sabati s WHERE s.data < ? AND s.importo > 0 AND s.dipendente_id IN (' +
+    ids.map(() => '?').join(',') + ') AND s.data = (SELECT MAX(x.data) FROM sabati x WHERE x.dipendente_id = s.dipendente_id ' +
+    'AND x.data < ? AND x.importo > 0)').all(dataChiave, ...ids, dataChiave)
+    .forEach((r) => out.set(r.id, r.importo));
+  return out;
+}
+
+// ---------------------------------------------------------------- cantieri
+
+export function cantieri(db) {
+  return db.prepare('SELECT id, nome, attivo FROM cantieri ORDER BY attivo DESC, nome COLLATE NOCASE').all()
+    .map((r) => ({ id: r.id, nome: r.nome, attivo: r.attivo === 1 }));
+}
+
+export function aggiungiCantiere(db, nome) {
+  const n = String(nome || '').trim().replace(/\s+/g, ' ');
+  if (n.length < 2 || n.length > 60 || /[<>"&]/.test(n)) return { ok: false, errore: 'Scrivi il nome del cantiere (es. Via Roma - Bari).' };
+  const c = db.prepare('SELECT id, attivo FROM cantieri WHERE nome = ? COLLATE NOCASE').get(n);
+  if (c) return { ok: false, errore: 'Il cantiere c\'è già' + (c.attivo ? '.' : ', ma non è attivo: riattivalo.') };
+  const id = db.prepare('INSERT INTO cantieri (nome) VALUES (?)').run(n).lastInsertRowid;
+  registra(db, 'CANTIERI', 'aggiunto ' + n);
+  return { ok: true, id, nome: n };
+}
+
+export function cambiaAttivoCantiere(db, id, attivo) {
+  const r = db.prepare('UPDATE cantieri SET attivo = ? WHERE id = ?').run(attivo ? 1 : 0, id);
+  if (r.changes) registra(db, 'CANTIERI', 'cantiere ' + id + (attivo ? ' riattivato' : ' disattivato'));
+  return r.changes > 0;
+}
+
+/**
+ * Il cantiere di ogni dipendente in un mese ("2026-10"): quello assegnato a quel mese
+ * o, se manca, l'ultimo dei mesi prima. id dipendente -> { id, nome, ereditato }
+ */
+export function cantieriDelMese(db, mese) {
+  const out = new Map();
+  db.prepare(
+    'SELECT cm.dipendente_id AS dip, cm.mese, c.id, c.nome FROM cantieri_mese cm JOIN cantieri c ON c.id = cm.cantiere_id ' +
+    'WHERE cm.mese = (SELECT MAX(x.mese) FROM cantieri_mese x WHERE x.dipendente_id = cm.dipendente_id AND x.mese <= ?)')
+    .all(mese).forEach((r) => out.set(r.dip, { id: r.id, nome: r.nome, ereditato: r.mese !== mese }));
+  return out;
+}
+
+/** Assegna (o con cantiereId null toglie) il cantiere di un dipendente per un mese. */
+export function assegnaCantiere(db, dipendenteId, mese, cantiereId, chi) {
+  if (cantiereId === null) {
+    db.prepare('DELETE FROM cantieri_mese WHERE mese = ? AND dipendente_id = ?').run(mese, dipendenteId);
+  } else {
+    db.prepare('INSERT INTO cantieri_mese (mese, dipendente_id, cantiere_id, inserito_da, aggiornato) VALUES (?, ?, ?, ?, ?) ' +
+      'ON CONFLICT(mese, dipendente_id) DO UPDATE SET cantiere_id = excluded.cantiere_id, ' +
+      'inserito_da = excluded.inserito_da, aggiornato = excluded.aggiornato').run(mese, dipendenteId, cantiereId, chi, D.timbro());
+  }
+  registra(db, 'CANTIERI', mese + ': dipendente ' + dipendenteId + ' -> ' + (cantiereId === null ? 'come il mese prima' : 'cantiere ' + cantiereId) + ' da ' + chi);
+}
+
+export function confermaCantieri(db, mese, chi) {
+  db.prepare('INSERT INTO conferme_cantieri (mese, confermato_da, quando) VALUES (?, ?, ?) ' +
+    'ON CONFLICT(mese) DO UPDATE SET confermato_da = excluded.confermato_da, quando = excluded.quando').run(mese, chi, D.timbro());
+  registra(db, 'CANTIERI', 'cantieri di ' + mese + ' confermati da ' + chi);
+}
+
+/** { da, quando, modificatoDopo } se i cantieri del mese sono confermati, altrimenti null. */
+export function confermaDel(db, mese) {
+  const r = db.prepare('SELECT confermato_da, quando FROM conferme_cantieri WHERE mese = ?').get(mese);
+  if (!r) return null;
+  const dopo = db.prepare('SELECT inserito_da FROM cantieri_mese WHERE mese = ? AND aggiornato > ? ORDER BY aggiornato DESC LIMIT 1').get(mese, r.quando);
+  return { da: r.confermato_da, quando: r.quando, modificatoDopo: dopo ? dopo.inserito_da : '' };
+}
+
+/**
+ * I mesi con i cantieri ancora da confermare, adesso: il mese in corso e, negli
+ * ultimi CFG.GIORNI_PRIMA_CANTIERI giorni, anche il prossimo. Mai prima di PRIMO_GIORNO.
+ * [{ mese: "2026-12", nome: "dicembre", iniziato: false }]
+ */
+export function cantieriDaConfermare(db, adesso = new Date()) {
+  const o = D.oggi(adesso);
+  const ultimo = new Date(o.getFullYear(), o.getMonth() + 1, 0).getDate();
+  const mesi = [new Date(o.getFullYear(), o.getMonth(), 1)];
+  if (ultimo - o.getDate() < CFG.GIORNI_PRIMA_CANTIERI) mesi.push(new Date(o.getFullYear(), o.getMonth() + 1, 1));
+  const primo = D.primoGiorno();
+  return mesi
+    .filter((m) => !primo || new Date(m.getFullYear(), m.getMonth() + 1, 0) >= primo)
+    .map((m) => ({ mese: D.meseDi(m), nome: CFG.MESI[m.getMonth()].toLowerCase(), iniziato: m <= o }))
+    .filter((m) => !confermaDel(db, m.mese));
+}
+
+/**
+ * Si puo' fare il foglio del mese? Serve che ogni giorno sia compilato e che
+ * i cantieri del mese siano confermati. { ok, mancanti: [3, 4], confermati, senzaCantiere: [nomi] }
+ */
+export function prontoPerIlFoglio(db, anno, mese0) {
+  const mese = D.meseChiave(anno, mese0);
+  const mancanti = mancantiPerIlFoglio(db, anno, mese0);
+  const confermati = !!confermaDel(db, mese);
+  const assegnati = cantieriDelMese(db, mese);
+  const senzaCantiere = dipendentiAttivi(db).filter((d) => !assegnati.has(d.id)).map((d) => d.nome);
+  return { ok: !mancanti.length && confermati, mancanti, confermati, senzaCantiere };
+}
+
+/** Perche' il foglio non si puo' ancora fare, in una frase ('' se si puo'). */
+export function motivoFoglio(p, nomeMese) {
+  const pezzi = [];
+  if (p.mancanti.length) pezzi.push('mancano ancora i giorni ' + p.mancanti.join(', '));
+  if (!p.confermati) pezzi.push('i cantieri di ' + nomeMese + ' non sono ancora confermati');
+  return pezzi.length ? 'Il foglio si prepara solo a mese completo: ' + pezzi.join(' e ') + '.' : '';
+}
+
 /**
  * I giorni "fatti" per un utente, fra `dal` e `al`: { "2026-09-15": true }.
  * Socio: fatto se ha segnato almeno uno dei suoi uomini.
@@ -325,7 +498,7 @@ export function presenzeIntervallo(db, dal, al) {
  */
 export function giorniCompilatiPer(db, utente, dal, al) {
   const attivi = dipendentiAttivi(db);
-  const righe = presenzeIntervallo(db, dal, al);
+  const righe = compilazioniIntervallo(db, dal, al);
   const out = {};
 
   if (!vedeTutto(utente)) {

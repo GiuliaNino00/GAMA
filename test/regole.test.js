@@ -1,7 +1,7 @@
 // Le regole di squadra, l'appello, gli extra, l'organico e gli utenti.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { banco, ADESSO, compilaMese } from './aiuto.js';
+import { banco, ADESSO, compilaMese, confermaMese } from './aiuto.js';
 import * as Q from '../src/dati.js';
 import * as V from '../src/viste.js';
 import { esegui } from '../src/azioni.js';
@@ -256,12 +256,12 @@ test('i soci sistemano il mese in corso e fino al 15 il mese prima, l\'amministr
   assert.match(vecchio.errore, /da martedì 1 settembre in poi.*chiedi a Giuliano/);
   // il 15 settembre agosto e' ancora aperto, luglio no
   const il15 = { ...ctx, adesso: new Date(2026, 8, 15, 19) };
-  assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260801', stati: { 'PIPERIS P.': 'ORD' } }, il15).ok, true);
+  assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260803', stati: { 'PIPERIS P.': 'ORD' } }, il15).ok, true);
   assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260731', stati: { 'PIPERIS P.': 'ORD' } }, il15).ok, false);
   assert.equal(appello(db, matteo, '20260831').ok, false);
   assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20210104', stati: { 'PIPERIS P.': 'ORD' } }, ctx).ok, false);
-  assert.equal(esegui(db, giuliano, 'salvaAppello', { d: '20260801', stati: { 'PIPERIS P.': 'FER' } }, ctx).ok, true);
-  assert.equal(appello(db, giuliano, '20260801').ok, true);
+  assert.equal(esegui(db, giuliano, 'salvaAppello', { d: '20260803', stati: { 'PIPERIS P.': 'FER' } }, ctx).ok, true);
+  assert.equal(appello(db, giuliano, '20260803').ok, true);
 });
 
 test('assumere un doppione di un\'altra squadra non rivela chi e\'', () => {
@@ -343,11 +343,16 @@ test('foglio del mese: solo a mese completo, solo l\'amministratore, con l\'indi
   Q.salvaPresenze(db, '2026-08-10', { "D'AMORE E.": 'ASS' }, 'prova');
   m = V.carica(db, giuliano, 'mese', '202608', ctx).dati;
   assert.deepEqual(m.daCompletare, []);
+  assert.equal(m.scaricabile, false, 'giorni completi, ma i cantieri non sono confermati');
+  assert.match(m.motivo, /cantieri di agosto non sono ancora confermati/);
+  confermaMese(db, 2026, 7);
+  m = V.carica(db, giuliano, 'mese', '202608', ctx).dati;
   assert.equal(m.scaricabile, true);
-  assert.deepEqual(m.agenzia, { nome: 'Gama srl', email: 'gamasrl2026@gmail.com' });
+  assert.equal(m.motivo, '');
+  assert.deepEqual(m.commercialista, { nome: 'Studio Corvasce', email: 'studiocorvasceconsulenza@gmail.com' });
   const s = V.carica(db, matteo, 'mese', '202608', ctx).dati;
   assert.equal(s.scaricabile, false);
-  assert.equal(s.agenzia, null, 'un socio non riceve l\'indirizzo');
+  assert.equal(s.commercialista, null, 'un socio non riceve l\'indirizzo');
   // il mese in corso non e' completo finche' non arriva l'ultimo giorno
   assert.ok(V.carica(db, giuliano, 'mese', '202609', ctx).dati.daCompletare.includes(30));
 });
@@ -390,7 +395,7 @@ test('Agenzia: vede e corregge tutto, gestisce i dipendenti, ma non utenti e lin
   // il foglio si', il pulsante "Invia all'agenzia" no
   const m = V.carica(db, ag, 'mese', '202609', ctx).dati;
   assert.ok(m.daCompletare.length > 0);
-  assert.equal(m.agenzia, null);
+  assert.deepEqual(m.commercialista.email, 'studiocorvasceconsulenza@gmail.com', 'anche l\'agenzia prepara la mail');
   // nella pagina iniziale non c'e' nessun link di nessuno
   const a = V.avvio(db, ag, { adesso: ADESSO });
   assert.deepEqual([a.admin, a.agenzia, a.tutto], [false, true, true]);

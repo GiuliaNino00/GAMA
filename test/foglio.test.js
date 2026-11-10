@@ -14,21 +14,21 @@ async function leggi(buf) {
   return wb;
 }
 
-test('blocchi da 11 righe, giorni, lettere, ore al posto giusto', async () => {
+test('blocchi da 13 righe, giorni, lettere, ore al posto giusto', async () => {
   const { db, giuliano } = banco();   // giorni di inizio mese: li puo' scrivere solo l'amministratore
   esegui(db, giuliano, 'salvaAppello', { d: '20260901', stati: { 'PIPERIS P.': 'ORD', 'PIPERIS G.': 'MEZ', 'ZUCCARO D.': 'ASS' } }, ctx);
   esegui(db, giuliano, 'salvaAppello', { d: '20260902', stati: { 'PIPERIS P.': 'FER' } }, ctx);
   esegui(db, giuliano, 'salvaAppello', { d: '20260902', stati: { "D'AMORE E.": 'FES' } }, ctx);
 
   const wb = await leggi(await foglioMese(db, 2026, 8));
-  assert.deepEqual(wb.worksheets.map((w) => w.name), ['SETTEMBRE 2026', 'RIEPILOGO']);
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ['SETTEMBRE 2026', 'RIEPILOGO', 'TRASFERTE']);
   const ws = wb.getWorksheet('SETTEMBRE 2026');
 
   // primo blocco: PIPERIS P. alla riga 2
   assert.equal(ws.getCell('A2').value, 'PIPERIS P.');
   assert.equal(ws.getCell('A2').font.size, 16);
   assert.equal(ws.getCell('A2').font.bold, true);
-  assert.equal(ws.getCell('I2').value, 'MURATORI', 'la squadra dove stava il cantiere');
+  assert.equal(ws.getCell('I2').value, 'MURATORI', 'senza cantiere: la squadra nel riquadro');
   assert.equal(ws.getCell('I2').fill.fgColor.argb, 'FF00B0F0');
   assert.equal(ws.getCell('A3').value, 'gg.');
   assert.equal(ws.getCell('B3').value, 1);
@@ -41,21 +41,24 @@ test('blocchi da 11 righe, giorni, lettere, ore al posto giusto', async () => {
   assert.equal(ws.getCell('A7').value, 'fer');
   assert.equal(ws.getCell('C7').value, 8, 'ferie del 2 settembre');
   assert.equal(ws.getCell('A9').value, 'fes');
+  assert.equal(ws.getCell('A11').value, 'pioggia');
   assert.equal(ws.getCell('B3').border.top.style, 'thin');
+  assert.equal(ws.getCell('F5').fill.fgColor.argb, 'FFE7E9EC', 'il 5 settembre e\' sabato: grigio');
+  assert.notEqual(ws.getCell('E5').fill && ws.getCell('E5').fill.fgColor && ws.getCell('E5').fill.fgColor.argb, 'FFE7E9EC', 'il 4 settembre no');
 
-  // secondo blocco: PIPERIS G. alla riga 13 con la mezza giornata
-  assert.equal(ws.getCell('A13').value, 'PIPERIS G.');
-  assert.equal(ws.getCell('B16').value, 4);
+  // secondo blocco: PIPERIS G. alla riga 15 con la mezza giornata
+  assert.equal(ws.getCell('A15').value, 'PIPERIS G.');
+  assert.equal(ws.getCell('B18').value, 4);
   // terzo: ZUCCARO assente => nessuna ora
-  assert.equal(ws.getCell('A24').value, 'ZUCCARO D.');
-  assert.equal(ws.getCell('B27').value, null);
+  assert.equal(ws.getCell('A28').value, 'ZUCCARO D.');
+  assert.equal(ws.getCell('B31').value, null);
   // quarto: il primo carpentiere, con il festivo
-  assert.equal(ws.getCell('A35').value, "D'AMORE E.");
-  assert.equal(ws.getCell('I35').value, 'CARPENTIERI');
-  assert.equal(ws.getCell('C42').value, 8);
+  assert.equal(ws.getCell('A41').value, "D'AMORE E.");
+  assert.equal(ws.getCell('I41').value, 'CARPENTIERI');
+  assert.equal(ws.getCell('C48').value, 8);
   // ultimo: chi non ha squadra, senza riquadro azzurro
-  assert.equal(ws.getCell('A57').value, 'STRIPPOLI F.');
-  assert.equal(ws.getCell('I57').value, null);
+  assert.equal(ws.getCell('A67').value, 'STRIPPOLI F.');
+  assert.equal(ws.getCell('I67').value, null);
   assert.equal(ws.pageSetup.orientation, 'landscape');
 });
 
@@ -70,11 +73,11 @@ test('scheda RIEPILOGO: totali per dipendente e compensi extra', async () => {
   assert.equal(rs.getCell('A1').value, 'Dipendente');
   const riga = (nome) => { let t = null; rs.eachRow((r) => { if (r.getCell(1).value === nome) t = r; }); return t; };
   const p = riga('PIPERIS P.');
-  assert.deepEqual([p.getCell(3).value, p.getCell(4).value, p.getCell(8).value, p.getCell(9).value], [2, 16, 150, 'sabato; trasferta']);
+  assert.deepEqual([p.getCell(4).value, p.getCell(5).value, p.getCell(10).value, p.getCell(11).value], [2, 16, 150, 'sabato; trasferta']);
   const g = riga('PIPERIS G.');
-  assert.deepEqual([g.getCell(3).value, g.getCell(4).value, g.getCell(5).value, g.getCell(6).value], [1, 4, 1, 1]);
+  assert.deepEqual([g.getCell(4).value, g.getCell(5).value, g.getCell(6).value, g.getCell(7).value], [1, 4, 1, 1]);
   const tot = riga('TOTALE');
-  assert.deepEqual([tot.getCell(4).value, tot.getCell(8).value], [20, 150]);
+  assert.deepEqual([tot.getCell(5).value, tot.getCell(10).value], [20, 150]);
 });
 
 test('altre ore: nel foglio il numero vero nella riga ord. e nei totali', async () => {
@@ -88,7 +91,7 @@ test('altre ore: nel foglio il numero vero nella riga ord. e nei totali', async 
   assert.deepEqual([ws.getCell('B5').value, ws.getCell('C5').value, ws.getCell('D5').value], [10, 3, 8]);
   const rs = wb.getWorksheet('RIEPILOGO');
   let p = null; rs.eachRow((r) => { if (r.getCell(1).value === 'PIPERIS P.') p = r; });
-  assert.deepEqual([p.getCell(3).value, p.getCell(4).value, p.getCell(5).value], [3, 21, 0]);
+  assert.deepEqual([p.getCell(4).value, p.getCell(5).value, p.getCell(6).value], [3, 21, 0]);
 });
 
 test('chi e\' uscito a meta\' mese c\'e\', chi non ha mai lavorato ed e\' uscito no', async () => {

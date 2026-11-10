@@ -5,7 +5,9 @@
  *   domenica 20:00              → riepilogo della settimana
  *   il 1° del mese alle 8:00    → mese chiuso: foglio pronto, oppure l'elenco dei giorni
  *                                 ancora vuoti a chi li deve compilare
- *   appena il mese scorso e' completo → all'amministratore: foglio pronto (una volta sola)
+ *   appena il mese scorso e' completo → ad amministratore e agenzia: foglio pronto (una volta sola)
+ *   ogni mattina alle 9             → se i cantieri del mese (o, negli ultimi giorni, del prossimo)
+ *                                     non sono confermati, avviso ad amministratore e agenzia
  *   ogni notte alle 2:00        → copia di sicurezza del database
  *
  * Ogni lavoro gira al massimo una volta al giorno. Se il server era spento
@@ -21,7 +23,9 @@ export const LAVORI = [
   { nome: 'appello',   ora: CFG.ORA_APPELLO,   finestraOre: 3,  giorno: (d) => D.giornoDiLavoro(d) },
   { nome: 'settimana', ora: CFG.ORA_RIEPILOGO, finestraOre: 3,  giorno: (d) => d.getDay() === 0 },
   { nome: 'mese',      ora: CFG.ORA_MESE,      finestraOre: 12, giorno: (d) => d.getDate() === 1 },
-  { nome: 'backup',    ora: CFG.ORA_BACKUP,    finestraOre: 20, giorno: () => true }
+  { nome: 'backup',    ora: CFG.ORA_BACKUP,    finestraOre: 20, giorno: () => true },
+  // ogni mattina, ma avvisa solo se ci sono cantieri da confermare (vedi Q.cantieriDaConfermare)
+  { nome: 'cantieri',  ora: CFG.ORA_CANTIERI,  finestraOre: 6,  giorno: () => true }
 ];
 
 /** Quali lavori vanno fatti adesso, sapendo quando e' stato fatto l'ultimo. */
@@ -55,9 +59,11 @@ export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new D
         const oggiVuoto = vuoti.some((d) => D.chiave(d) === D.chiave(oggi));
         const altri = vuoti.length - (oggiVuoto ? 1 : 0);
         if (oggiVuoto) {
+          const sab = D.eSabato(oggi);
           invii.push(notifiche.invia(u, {
-            titolo: '📋 Appello di oggi',
-            testo: 'Tocca per segnare chi ha lavorato oggi.' + (altri ? ' Ci sono anche ' + altri + ' giorni arretrati.' : ''),
+            titolo: sab ? '🚚 Trasferte di oggi' : '📋 Appello di oggi',
+            testo: (sab ? 'Tocca per segnare le trasferte del sabato.' : 'Tocca per segnare chi ha lavorato oggi.') +
+              (altri ? ' Ci sono anche ' + altri + ' giorni arretrati.' : ''),
             percorso: 'appello/' + D.codice(oggi)
           }));
         } else if (altri) {
@@ -85,25 +91,41 @@ export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new D
 
     async mese(ora) {
       const { anno, mese0, cod, nome } = meseScorso(ora);
-      const manca = Q.mancantiPerIlFoglio(db, anno, mese0);
-      if (!manca.length) Q.scriviImpostazione(db, 'foglio_pronto_' + cod, D.timbro(ora));
-      // all'Agenzia si scrive solo quando il foglio e' pronto
+      const pronto = Q.prontoPerIlFoglio(db, anno, mese0);
+      const manca = pronto.mancanti;
+      if (pronto.ok) Q.scriviImpostazione(db, 'foglio_pronto_' + cod, D.timbro(ora));
+      // all'Agenzia si scrive solo quando i giorni ci sono tutti (foglio pronto o cantieri da confermare)
       await Promise.allSettled(conDipendenti().filter((u) => !u.agenzia || !manca.length).map((u) => {
         const suoi = Q.vedeTutto(u) ? manca : Q.giorniMancantiDelMese(db, u, anno, mese0);
-        let titolo, testo;
-        if (!suoi.length) {
+        let titolo, testo, percorso = 'mese/' + cod;
+        if (!suoi.length && Q.vedeTutto(u) && !pronto.confermati) {
+          titolo = '🏗️ Cantieri di ' + nome + ' da confermare';
+          testo = 'I giorni sono tutti compilati: conferma i cantieri di ' + nome + ' e il documento del mese sarà pronto.';
+          percorso = 'cantieri/' + D.meseChiave(anno, mese0);
+        } else if (!suoi.length) {
           titolo = '📄 Mese di ' + nome + ' chiuso';
-          testo = u.admin ? 'Il foglio presenze è pronto da scaricare per l\'agenzia.'
-            : u.agenzia ? 'Il foglio presenze è completo e pronto da scaricare.' : 'Guarda il riepilogo del mese.';
+          testo = Q.vedeTutto(u) ? 'Il documento del mese è pronto: PDF da mandare a ' + CFG.COMMERCIALISTA.nome + '.'
+            : 'Guarda il riepilogo del mese.';
         } else if (u.admin) {
           titolo = '📄 ' + CFG.MESI[mese0].charAt(0) + nome.slice(1) + ' non è completo';
-          testo = 'Mancano i giorni ' + suoi.join(', ') + ': il foglio per l\'agenzia sarà pronto quando sarà tutto compilato.';
+          testo = 'Mancano i giorni ' + suoi.join(', ') + ': il documento del mese sarà pronto quando sarà tutto compilato.';
         } else {
           titolo = '📅 Mancano dei giorni di ' + nome;
           testo = 'Giorni ' + suoi.join(', ') + ': compilali entro il ' + CFG.GIORNO_CHIUSURA_MESE_PRIMA + '.';
         }
-        return notifiche.invia(u, { titolo, testo, percorso: 'mese/' + cod });
+        return notifiche.invia(u, { titolo, testo, percorso });
       }));
+    },
+
+    async cantieri(ora) {
+      const da = Q.cantieriDaConfermare(db, ora);
+      if (!da.length || !Q.dipendentiAttivi(db).length) return;
+      const m = da[0];
+      await Promise.allSettled(Q.utentiAttivi(db).filter((u) => Q.vedeTutto(u)).map((u) => notifiche.invia(u, {
+        titolo: '🏗️ Cantieri di ' + m.nome + ' da confermare',
+        testo: (m.iniziato ? 'Il mese è iniziato: ' : 'Prima che inizi il mese: ') + 'controlla il cantiere di ognuno e conferma.',
+        percorso: 'cantieri/' + m.mese
+      })));
     },
 
     async backup(ora) {
@@ -120,13 +142,12 @@ export function creaOrologio(db, { notifiche, cartellaDati, adesso = () => new D
     if (ora.getDate() === 1 && ora.getHours() < CFG.ORA_MESE) return;
     const { anno, mese0, cod, nome } = meseScorso(ora);
     const chiave = 'foglio_pronto_' + cod;
-    if (Q.leggiImpostazione(db, chiave) || Q.mancantiPerIlFoglio(db, anno, mese0).length) return;
+    if (Q.leggiImpostazione(db, chiave) || !Q.prontoPerIlFoglio(db, anno, mese0).ok) return;
     Q.scriviImpostazione(db, chiave, D.timbro(ora));
     Q.registra(db, 'OROLOGIO', 'foglio di ' + nome + ' completo');
     await Promise.allSettled(Q.utentiAttivi(db).filter((u) => u.admin || u.agenzia).map((u) => notifiche.invia(u, {
       titolo: '📄 Foglio di ' + nome + ' pronto',
-      testo: u.admin ? 'Tutti i giorni sono compilati: puoi scaricarlo e mandarlo a ' + CFG.AGENZIA.nome + '.'
-        : 'Tutti i giorni sono compilati: puoi scaricarlo.',
+      testo: 'Giorni compilati e cantieri confermati: scarica il PDF e prepara la mail per ' + CFG.COMMERCIALISTA.nome + '.',
       percorso: 'mese/' + cod
     })));
   }
