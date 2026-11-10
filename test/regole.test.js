@@ -129,6 +129,38 @@ test('riepiloghi: solo la propria squadra, ore giuste, giorni mancanti', () => {
   assert.deepEqual(s.mancanti, [15, 16]);
 });
 
+test('altre ore: da 1 a 12 tranne 4 e 8, e contano nei riepiloghi', () => {
+  const { db, matteo } = banco();
+  const alt = (ore) => ({ codice: 'ALT', ore });
+  const r = esegui(db, matteo, 'salvaAppello',
+    { d: '20260914', stati: { 'PIPERIS P.': alt(10), 'PIPERIS G.': 'MEZ', 'ZUCCARO D.': alt(6) } }, ctx);
+  assert.deepEqual(r, { ok: true, messaggio: '3 al lavoro, 20 ore registrate.' });
+  const salvate = Q.presenzeDelGiorno(db, '2026-09-14');
+  assert.deepEqual([salvate['PIPERIS P.'].codice, salvate['PIPERIS P.'].ore], ['ALT', 10]);
+
+  // l'appello riapre con le ore scelte, solo dove servono
+  const righe = appello(db, matteo, '20260914').dati.righe;
+  assert.deepEqual(righe.map((x) => [x.stato, x.ore]), [['ALT', 10], ['MEZ', undefined], ['ALT', 6]]);
+
+  const s = V.carica(db, matteo, 'settimana', null, ctx).dati;
+  assert.equal(s.oreTotali, 20);
+  assert.deepEqual(s.righe.map((x) => [x.gg, x.ore, x.mezze]), [[1, 10, 0], [1, 4, 1], [1, 6, 0]]);
+});
+
+test('altre ore: 4 e 8 diventano mezza giornata e giornata intera, il resto si scarta', () => {
+  const { db, matteo } = banco();
+  const alt = (ore) => ({ codice: 'ALT', ore });
+  esegui(db, matteo, 'salvaAppello', { d: '20260914', stati: { 'PIPERIS P.': alt(8), 'PIPERIS G.': alt(4) } }, ctx);
+  const salvate = Q.presenzeDelGiorno(db, '2026-09-14');
+  assert.deepEqual([salvate['PIPERIS P.'].codice, salvate['PIPERIS G.'].codice], ['ORD', 'MEZ']);
+
+  for (const sbagliata of [alt(0), alt(13), alt(2.5), alt(-3), alt('6; DROP'), alt(null), 'ALT']) {
+    assert.equal(esegui(db, matteo, 'salvaAppello', { d: '20260915', stati: { 'ZUCCARO D.': sbagliata } }, ctx).ok, false,
+      JSON.stringify(sbagliata));
+  }
+  assert.deepEqual(Q.presenzeDelGiorno(db, '2026-09-15'), {});
+});
+
 test('chi viene disattivato a meta\' mese resta nel riepilogo del mese in cui ha lavorato', () => {
   const { db, giuliano, matteo } = banco();
   esegui(db, matteo, 'salvaAppello', { d: '20260914', stati: { 'ZUCCARO D.': 'ORD' } }, ctx);

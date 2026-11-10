@@ -39,7 +39,9 @@ export function datiAppello(db, data, utente) {
     righe: elenco.map((d) => ({
       nome: d.nome,
       squadra: d.squadra,
-      stato: gia[d.nome] ? gia[d.nome].codice : D.statoPredefinito(data)
+      stato: gia[d.nome] ? gia[d.nome].codice : D.statoPredefinito(data),
+      // le ore servono solo per "altre ore": per gli altri codici le dice il codice
+      ...(gia[d.nome] && gia[d.nome].codice === 'ALT' ? { ore: gia[d.nome].ore } : {})
     }))
   };
 }
@@ -96,7 +98,7 @@ export function riassuntoPeriodo(db, dal, al, titolo, utente, adesso = new Date(
   for (const r of Q.presenzeIntervallo(db, dal, al)) {
     const p = per.get(r.dipendenteId);
     if (!p) continue;
-    if (r.codice === 'ORD') { p.ore += r.ore; p.gg += 1; }
+    if (r.codice === 'ORD' || r.codice === 'ALT') { p.ore += r.ore; p.gg += 1; }
     if (r.codice === 'MEZ') { p.ore += r.ore; p.gg += 1; p.mezze += 1; }
     if (r.codice === 'FER') p.fer += 1;
     if (r.codice === 'FES') p.fes += 1;
@@ -163,7 +165,7 @@ export function datiHome(db, utente, adesso = new Date()) {
   const salvate = Q.presenzeDelGiorno(db, D.chiave(oggi));
   for (const d of miei) {
     const c = salvate[d.nome] && CFG.CODICI[salvate[d.nome].codice];
-    if (c && c.riga === 'ord.') { presenti++; ore += c.ore; }
+    if (c && c.riga === 'ord.') { presenti++; ore += salvate[d.nome].ore; }
   }
 
   const dow = oggi.getDay();
@@ -239,6 +241,7 @@ export function avvio(db, utente, { vapid = '', adesso = new Date() } = {}) {
     squadra: utente.squadra,
     squadre: CFG.SQUADRE,
     ciclo: CFG.CICLO,
+    oreAScelta: CFG.ORE_A_SCELTA,
     codici: CFG.CODICI,
     oggi: D.codice(oggi),
     appello: datiAppello(db, oggi, utente),

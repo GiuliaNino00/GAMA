@@ -30,10 +30,10 @@ export async function foglioMese(db, anno, mese0) {
   const tutti = { admin: true };                       // il foglio e' unico per tutta l'azienda
   const elenco = dipendentiDelPeriodo(db, tutti, dal, al);
 
-  const indice = new Map();                            // id -> giorno -> codice
+  const indice = new Map();                            // id -> giorno -> { codice, ore }
   for (const p of Q.presenzeIntervallo(db, dal, al)) {
     if (!indice.has(p.dipendenteId)) indice.set(p.dipendenteId, {});
-    indice.get(p.dipendenteId)[D.daChiave(p.data).getDate()] = p.codice;
+    indice.get(p.dipendenteId)[D.daChiave(p.data).getDate()] = { codice: p.codice, ore: p.ore };
   }
 
   const lettere = [];
@@ -56,7 +56,7 @@ export async function foglioMese(db, anno, mese0) {
 
   elenco.forEach((dip, n) => {
     const r = 1 + n * RIGHE_BLOCCO + 1;                // si lascia una riga vuota in cima, come nel vostro
-    const codici = indice.get(dip.id) || {};
+    const voci = indice.get(dip.id) || {};
 
     // riga del nome + squadra nel riquadro azzurro (I:Q)
     const rigaNome = ws.getRow(r);
@@ -74,8 +74,9 @@ export async function foglioMese(db, anno, mese0) {
 
     const valori = { 'ord.': [], fer: [], fes: [] };
     for (let g = 1; g <= giorni; g++) {
-      const def = CFG.CODICI[codici[g]];
-      for (const et of Object.keys(valori)) valori[et].push(def && def.riga === et ? def.ore : null);
+      const v = voci[g];
+      const def = v && CFG.CODICI[v.codice];
+      for (const et of Object.keys(valori)) valori[et].push(def && def.riga === et ? v.ore : null);
     }
 
     const contenuto = [
@@ -132,12 +133,13 @@ export async function foglioMese(db, anno, mese0) {
   ];
   const totali = { gg: 0, ore: 0, mezze: 0, fer: 0, fes: 0, extra: 0 };
   for (const dip of elenco) {
-    const codici = Object.values(indice.get(dip.id) || {});
+    const voci = Object.values(indice.get(dip.id) || {});
+    const codici = voci.map((v) => v.codice);
     const riga = {
       nome: dip.nome,
       squadra: dip.squadra ? dip.squadra.charAt(0) + dip.squadra.slice(1).toLowerCase() : '',
-      gg: codici.filter((c) => c === 'ORD' || c === 'MEZ').length,
-      ore: codici.reduce((s, c) => s + (CFG.CODICI[c] && CFG.CODICI[c].riga === 'ord.' ? CFG.CODICI[c].ore : 0), 0),
+      gg: codici.filter((c) => c === 'ORD' || c === 'MEZ' || c === 'ALT').length,
+      ore: voci.reduce((s, v) => s + (CFG.CODICI[v.codice] && CFG.CODICI[v.codice].riga === 'ord.' ? v.ore : 0), 0),
       mezze: codici.filter((c) => c === 'MEZ').length,
       fer: codici.filter((c) => c === 'FER').length,
       fes: codici.filter((c) => c === 'FES').length,

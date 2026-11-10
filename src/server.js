@@ -112,7 +112,12 @@ export function creaApp({ db, notifiche, urlPubblico, adesso = () => new Date() 
   app.use(express.json({ limit: '200kb' }));
 
   app.get('/', (req, res) => res.set('Cache-Control', 'no-store').type('html').send(paginaBenvenuto(IMPRONTA)));
-  app.get('/salute', (req, res) => res.set('Cache-Control', 'no-store').json({ ok: true, versione: VERSIONE }));
+  // il battito (scripts/battito.sh) passa di qui da fuori: risponde ok solo se anche il database risponde
+  app.get('/salute', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try { db.prepare('SELECT 1').get(); } catch { return res.status(503).json({ ok: false, versione: VERSIONE }); }
+    res.json({ ok: true, versione: VERSIONE });
+  });
 
   const STATICI = compressi(['app.js', 'app.css']);
   app.get(['/statici/app.js', '/statici/app.css'], (req, res) => {

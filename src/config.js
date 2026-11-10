@@ -16,13 +16,19 @@ export const CFG = {
   CODICI: {
     ORD: { etichetta: '8 ore',          breve: '8 ore',   riga: 'ord.', ore: 8, emoji: '✅' },
     MEZ: { etichetta: 'mezza giornata', breve: '4 ore',   riga: 'ord.', ore: 4, emoji: '🕓' },
+    // le ore le sceglie chi fa l'appello (vedi ORE_A_SCELTA): ore qui non c'e'
+    ALT: { etichetta: 'altre ore',      breve: 'altre ore', riga: 'ord.', ore: null, emoji: '⏱️' },
     FER: { etichetta: 'ferie',          breve: 'ferie',   riga: 'fer',  ore: 8, emoji: '🏖️' },
     FES: { etichetta: 'festivo',        breve: 'festivo', riga: 'fes',  ore: 8, emoji: '🎉' },
     ASS: { etichetta: 'assente',        breve: 'assente', riga: null,   ore: 0, emoji: '⬜' }
   },
 
-  // Toccando un nome: 8 ore -> assente -> 4 ore -> di nuovo 8 ore.
-  CICLO: ['ORD', 'ASS', 'MEZ'],
+  // Toccando un nome: 8 ore -> assente -> 4 ore -> altre ore (si sceglie quante) -> di nuovo 8 ore.
+  CICLO: ['ORD', 'ASS', 'MEZ', 'ALT'],
+
+  // Le ore che si possono scegliere con "altre ore": da 1 a 12, tranne 4 e 8,
+  // che sono gia' la mezza giornata e la giornata intera.
+  ORE_A_SCELTA: [1, 2, 3, 5, 6, 7, 9, 10, 11, 12],
 
   ORA_APPELLO: 18,          // promemoria dell'appello (giorni lavorativi)
   ORA_RIEPILOGO: 20,        // riepilogo della settimana, la domenica

@@ -157,7 +157,8 @@ export async function importa(db, file) {
     for (const { r, ts } of ordinate) {
       const data = D.normalizzaData(r.DATA);
       const cod = String(r.CODICE || '').trim().toUpperCase();
-      if (!data || !CFG.CODICI[cod]) { rapporto.presenzeIgnorate++; continue; }
+      // il Foglio Google conosce solo i codici a ore fisse: "altre ore" non c'e'
+      if (!data || !CFG.CODICI[cod] || CFG.CODICI[cod].ore == null) { rapporto.presenzeIgnorate++; continue; }
       const id = idDi(r.DIPENDENTE);
       if (!id) { rapporto.presenzeIgnorate++; continue; }
       const esito = scrivi.run(data, id, cod, CFG.CODICI[cod].ore, String(r.INSERITO_DA || '').trim(), ts);

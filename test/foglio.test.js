@@ -77,6 +77,20 @@ test('scheda RIEPILOGO: totali per dipendente e compensi extra', async () => {
   assert.deepEqual([tot.getCell(4).value, tot.getCell(8).value], [20, 150]);
 });
 
+test('altre ore: nel foglio il numero vero nella riga ord. e nei totali', async () => {
+  const { db, giuliano } = banco();
+  esegui(db, giuliano, 'salvaAppello', { d: '20260901', stati: { 'PIPERIS P.': { codice: 'ALT', ore: 10 } } }, ctx);
+  esegui(db, giuliano, 'salvaAppello', { d: '20260902', stati: { 'PIPERIS P.': { codice: 'ALT', ore: 3 } } }, ctx);
+  esegui(db, giuliano, 'salvaAppello', { d: '20260903', stati: { 'PIPERIS P.': 'ORD' } }, ctx);
+
+  const wb = await leggi(await foglioMese(db, 2026, 8));
+  const ws = wb.getWorksheet('SETTEMBRE 2026');
+  assert.deepEqual([ws.getCell('B5').value, ws.getCell('C5').value, ws.getCell('D5').value], [10, 3, 8]);
+  const rs = wb.getWorksheet('RIEPILOGO');
+  let p = null; rs.eachRow((r) => { if (r.getCell(1).value === 'PIPERIS P.') p = r; });
+  assert.deepEqual([p.getCell(3).value, p.getCell(4).value, p.getCell(5).value], [3, 21, 0]);
+});
+
 test('chi e\' uscito a meta\' mese c\'e\', chi non ha mai lavorato ed e\' uscito no', async () => {
   const { db, giuliano } = banco();
   esegui(db, giuliano, 'salvaAppello', { d: '20260901', stati: { 'ZUCCARO D.': 'ORD' } }, ctx);

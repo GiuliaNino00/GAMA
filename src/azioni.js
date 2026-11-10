@@ -63,16 +63,17 @@ function salvaAppello(db, utente, c, adesso) {
 
   const validi = new Set(miei.map((d) => d.nome));
   const stati = {};
-  for (const [nome, cod] of Object.entries(c.stati || {})) {
-    if (validi.has(nome) && CFG.CODICI[String(cod)]) stati[nome] = String(cod);
+  for (const [nome, stato] of Object.entries(c.stati || {})) {
+    const v = validi.has(nome) && Q.voce(stato);
+    if (v) stati[nome] = v;
   }
   if (!Object.keys(stati).length) return { ok: false, errore: 'Non è arrivato nessun nome della tua squadra.' };
 
   Q.salvaPresenze(db, D.chiave(data), stati, utente.nome);
 
   let ore = 0, presenti = 0;
-  for (const cod of Object.values(stati)) {
-    if (CFG.CODICI[cod].riga === 'ord.') { ore += CFG.CODICI[cod].ore; presenti++; }
+  for (const v of Object.values(stati)) {
+    if (CFG.CODICI[v.codice].riga === 'ord.') { ore += v.ore; presenti++; }
   }
   return { ok: true, messaggio: presenti + ' al lavoro, ' + ore + ' ore registrate.' };
 }

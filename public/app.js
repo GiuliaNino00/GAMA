@@ -393,6 +393,40 @@
   }
 
   var PILLOLE = { ORD: ['spunta', '8 ore'], MEZ: ['orologio', '4 ore'], ASS: ['meno', 'Assente'], FER: ['calendario', 'Ferie'], FES: ['calendario', 'Festivo'] };
+  function pillola(r) { return r.stato === 'ALT' ? ['orologio', r.ore + ' ore'] : PILLOLE[r.stato] || PILLOLE.ASS; }
+
+  /**
+   * "Altre ore": un pannello dal basso con le ore da scegliere (niente 4 e 8, che hanno il
+   * loro tocco). Risponde con il numero scelto, o null se si chiude senza scegliere.
+   */
+  function scegliOre(nome, attuali) {
+    return new Promise(function (fine) {
+      var prima = document.activeElement;
+      var fondale = el('div', 'pannello-ore');
+      var p = el('div', 'pannello', '<h2 id="pannelloTit">Quante ore?</h2><p>' + testo(nome) + '</p>');
+      p.setAttribute('role', 'dialog'); p.setAttribute('aria-modal', 'true'); p.setAttribute('aria-labelledby', 'pannelloTit');
+      var griglia = el('div', 'ore-griglia');
+      function chiudi(ore) {
+        document.removeEventListener('keydown', tasto);
+        fondale.remove();
+        if (prima && prima.focus) prima.focus();
+        fine(ore);
+      }
+      function tasto(e) { if (e.key === 'Escape') chiudi(null); }
+      (S.oreAScelta || []).forEach(function (n) {
+        var b = bottone(n === attuali ? 'scelta' : null, '<b>' + n + '</b>', function () { vibra(); chiudi(n); });
+        b.setAttribute('aria-label', n + (n === 1 ? ' ora' : ' ore'));
+        griglia.appendChild(b);
+      });
+      p.appendChild(griglia);
+      p.appendChild(bottone('annulla', 'Annulla · torna a 8 ore', function () { chiudi(null); }));
+      fondale.appendChild(p);
+      fondale.addEventListener('click', function (e) { if (e.target === fondale) chiudi(null); });
+      document.addEventListener('keydown', tasto);
+      document.body.appendChild(fondale);
+      griglia.querySelector('button').focus();
+    });
+  }
 
   function disegnaAppello() {
     var A = S.appello;
@@ -403,6 +437,7 @@
     s.appendChild(el('div', 'contatori',
       '<span class="contatore verde">' + ico('spunta', 'i-s') + '<b id="cOrd">0</b> 8 ore</span>' +
       '<span class="contatore ambra">' + ico('orologio', 'i-s') + '<b id="cMez">0</b> 4 ore</span>' +
+      '<span class="contatore verde" id="cAltBox" hidden>' + ico('orologio', 'i-s') + '<b id="cAlt">0</b> altre</span>' +
       '<span class="contatore grigio">' + ico('meno', 'i-s') + '<b id="cAss">0</b> assenti</span>'));
 
     if (A.giaFatto) {
@@ -410,7 +445,7 @@
         ? 'Già salvato da ' + testo(A.giaFatto) + (A.quando ? ' alle ' + testo(A.quando) : '') + '. Puoi correggere e confermare di nuovo.'
         : 'Compilato in parte da ' + testo(A.giaFatto) + ': le altre squadre mancano ancora.') + '</span>'));
     }
-    s.appendChild(el('p', 'aiuto', 'Sono tutti a <b>8 ore</b>. Tocca un nome per cambiarlo: <b>8 ore → assente → 4 ore</b>.'));
+    s.appendChild(el('p', 'aiuto', 'Sono tutti a <b>8 ore</b>. Tocca un nome per cambiarlo: <b>8 ore → assente → 4 ore → altre ore</b>.'));
 
     var lista = el('div', 'lista');
     var squadre = {};
@@ -424,20 +459,27 @@
       }
       var b = bottone('riga');
       function dipingi() {
-        var p = PILLOLE[r.stato] || PILLOLE.ASS;
+        var p = pillola(r);
         b.setAttribute('data-s', r.stato);
         b.setAttribute('aria-label', r.nome + ': ' + p[1]);
         b.innerHTML = avatar(r.nome) + '<span class="nome">' + testo(r.nome) + '</span><span class="pill">' + ico(p[0], 'i-xs') + p[1] + '</span>';
       }
       dipingi();
-      b.addEventListener('click', function () {
-        var i = S.ciclo.indexOf(r.stato);
-        r.stato = S.ciclo[(i + 1) % S.ciclo.length];
+      function cambia(stato, ore) {
+        r.stato = stato;
+        if (stato === 'ALT') r.ore = ore; else delete r.ore;
         A.toccato = true;
         vibra();
         dipingi();
         b.classList.remove('colpo'); void b.offsetWidth; b.classList.add('colpo');
         conta();
+      }
+      b.addEventListener('click', function () {
+        var i = S.ciclo.indexOf(r.stato);
+        var dopo = S.ciclo[(i + 1) % S.ciclo.length];
+        if (dopo !== 'ALT') return cambia(dopo);
+        // dopo le 4 ore si scelgono le ore; chi chiude senza scegliere torna a 8 ore
+        scegliOre(r.nome, r.ore).then(function (ore) { if (ore) cambia('ALT', ore); else cambia(S.ciclo[0]); });
       });
       lista.appendChild(b);
     });
@@ -454,20 +496,23 @@
   }
 
   function conta() {
-    var c = { ORD: 0, MEZ: 0, ASS: 0 }, ore = 0;
+    var c = { ORD: 0, MEZ: 0, ALT: 0, ASS: 0 }, ore = 0;
     S.appello.righe.forEach(function (r) {
       var def = S.codici[r.stato];
       if (c[r.stato] !== undefined) c[r.stato]++;
-      if (def && def.riga === 'ord.') ore += def.ore;
+      if (def && def.riga === 'ord.') ore += r.stato === 'ALT' ? r.ore : def.ore;
     });
-    if ($('cOrd')) { $('cOrd').textContent = c.ORD; $('cMez').textContent = c.MEZ; $('cAss').textContent = c.ASS; }
+    if ($('cOrd')) {
+      $('cOrd').textContent = c.ORD; $('cMez').textContent = c.MEZ; $('cAss').textContent = c.ASS;
+      $('cAlt').textContent = c.ALT; $('cAltBox').hidden = !c.ALT;
+    }
     if ($('oreSalva')) $('oreSalva').textContent = '· ' + ore + ' ore';
   }
 
   function salvaAppello() {
     var b = $('salva'); b.disabled = true;
     var A = S.appello, stati = {};
-    A.righe.forEach(function (r) { stati[r.nome] = r.stato; });
+    A.righe.forEach(function (r) { stati[r.nome] = r.stato === 'ALT' ? { codice: 'ALT', ore: r.ore } : r.stato; });
     azione('salvaAppello', { d: A.codice, stati: stati, impronta: A.impronta || '' }).then(function (r) {
       b.disabled = false;
       if (r.conflitto) {

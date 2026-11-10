@@ -249,7 +249,24 @@ export function cambiaSquadra(db, nome, squadra) {
 // ---------------------------------------------------------------- presenze
 
 /**
- * Salva (o corregge) una giornata: { "ROSSI M.": "ORD", ... }.
+ * Lo stato di un dipendente come arriva dal telefono -> { codice, ore }, o null se non va.
+ * Di solito e' un codice ("ORD"); per le altre ore e' { codice: "ALT", ore: 6 }.
+ * Le altre ore a 4 o a 8 diventano mezza giornata e giornata intera: cosi' nel
+ * database 8 ore sono sempre ORD e 4 ore sempre MEZ.
+ */
+export function voce(stato) {
+  const codice = String(stato && typeof stato === 'object' ? stato.codice : stato);
+  const def = CFG.CODICI[codice];
+  if (!def) return null;
+  if (codice !== 'ALT') return { codice, ore: def.ore };
+  const ore = Number(stato.ore);
+  if (ore === CFG.CODICI.ORD.ore) return { codice: 'ORD', ore };
+  if (ore === CFG.CODICI.MEZ.ore) return { codice: 'MEZ', ore };
+  return CFG.ORE_A_SCELTA.includes(ore) ? { codice, ore } : null;
+}
+
+/**
+ * Salva (o corregge) una giornata: { "ROSSI M.": "ORD", "BIANCHI L.": { codice: "ALT", ore: 6 }, ... }.
  * Una sola transazione: o si salva tutto o niente.
  */
 export function salvaPresenze(db, dataChiave, stati, inseritoDa) {
@@ -261,11 +278,11 @@ export function salvaPresenze(db, dataChiave, stati, inseritoDa) {
   const quando = D.timbro();
   let quanti = 0;
   db.transaction(() => {
-    for (const [nome, cod] of Object.entries(stati)) {
+    for (const [nome, stato] of Object.entries(stati)) {
       const d = trova.get(nome);
-      const def = CFG.CODICI[cod];
-      if (!d || !def) continue;
-      scrivi.run(dataChiave, d.id, cod, def.ore, inseritoDa, quando);
+      const v = voce(stato);
+      if (!d || !v) continue;
+      scrivi.run(dataChiave, d.id, v.codice, v.ore, inseritoDa, quando);
       quanti++;
     }
   })();
